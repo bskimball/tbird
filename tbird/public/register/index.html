@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		
+
+		
+
+		<link rel="modulepreload" href="/./_app/start-6341b5a4.js">
+		<link rel="modulepreload" href="/./_app/chunks/vendor-432035a5.js">
+		<link rel="modulepreload" href="/./_app/chunks/singletons-12a22614.js">
+		<link rel="modulepreload" href="/./_app/pages/__layout.svelte-3487a680.js">
+		<link rel="modulepreload" href="/./_app/chunks/feathersClient-c6d1aa60.js">
+		<link rel="modulepreload" href="/./_app/pages/register.svelte-6049996c.js">
+		<link rel="stylesheet" href="/./_app/assets/start-8077b9bf.css">
+		<link rel="stylesheet" href="/./_app/assets/pages/__layout.svelte-f48abee7.css">
+
+		<script type="module">
+			import { start } from "/./_app/start-6341b5a4.js";
+			start({
+				target: document.querySelector("#svelte"),
+				paths: {"base":"","assets":"/."},
+				session: {},
+				host: location.host,
+				route: true,
+				spa: false,
+				trailing_slash: "never",
+				hydrate: {
+					status: 200,
+					error: null,
+					nodes: [
+						import("/./_app/pages/__layout.svelte-3487a680.js"),
+						import("/./_app/pages/register.svelte-6049996c.js")
+					],
+					page: {
+						host: location.host, // TODO this is redundant
+						path: "/register",
+						query: new URLSearchParams(""),
+						params: {}
+					}
+				}
+			});
+		</script>
+	</head>
+	<body>
+		<div id="svelte">
+
+
+<header><nav><ul><li><a sveltekit:prefetch href="/">Home</a></li>
+      <li><a sveltekit:prefetch href="/todos">Todos</a></li>
+      <li><a sveltekit:prefetch href="/messages">Messages</a></li>
+      <li><a sveltekit:prefetch href="/login">Log in</a></li>
+      <li class="active"><a sveltekit:prefetch href="/register">Register</a></li></ul></nav>
+
+  <div class="corner"></div></header>
+
+<main><div class="container mx-auto"><h1 class="text-4xl font-semibold leading-loose mb-4">Register</h1>
+  <form class="flex flex-col space-y-4"><div class="flex flex-col"><label for="email">Email</label>
+      <input type="text" name="email" id="email" autocomplete="username">
+      </div>
+    <div class="flex flex-col"><label for="password">Password</label>
+      <div class="flex items-center"><input type="password" name="password" id="password" class="w-full pr-10" autocomplete="current-password">
+        <button type="button" class="-ml-8 z-1 text-gray-600"><svg id="" class="" style="width:1.25em;height:1em;text-align:center;vertical-align:-.125em;overflow:visible;" viewBox="0 0 576 512" aria-hidden="true" role="img" xmlns="http://www.w3.org/2000/svg"><g transform="translate(256 256)"><g transform=""><path d="M572.52 241.4C518.29 135.59 410.93 64 288 64S57.68 135.64 3.48 241.41a32.35 32.35 0 0 0 0 29.19C57.71 376.41 165.07 448 288 448s230.32-71.64 284.52-177.41a32.35 32.35 0 0 0 0-29.19zM288 400a144 144 0 1 1 144-144 143.93 143.93 0 0 1-144 144zm0-240a95.31 95.31 0 0 0-25.31 3.79 47.85 47.85 0 0 1-66.9 66.9A95.78 95.78 0 1 0 288 160z" fill="currentColor" transform="translate(-256 -256)"></path></g></g></svg></button></div>
+      </div>
+    <div><button type="submit" class="bg-black text-white font-semibold py-2 px-4 shadow">Submit
+      </button></div></form></div></main>
+
+<footer><p>visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to learn SvelteKit
+  </p></footer>
+
+
+
+	
+</div>
+	</body>
+</html>

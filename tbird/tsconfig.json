@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "es2018",
+    "module": "esnext",
+    "outDir": "./build",
+    "strict": true,
+    "esModuleInterop": true,
+    "moduleResolution": "Node"
+  },
+  "include": ["server/src/**/*.ts", "server/src/**/*.d.ts"]
+}

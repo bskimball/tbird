@@ -1,0 +1,1492 @@
+import { respond } from "@sveltejs/kit/ssr";
+import cookie from "cookie";
+import { v4 } from "@lukeed/uuid";
+import * as yup from "yup";
+import { faEye } from "@fortawesome/free-solid-svg-icons";
+import io from "socket.io-client";
+import feathers from "@feathersjs/feathers";
+import socketIO from "@feathersjs/socketio-client";
+import authentication from "@feathersjs/authentication-client";
+function noop() {
+}
+function run(fn) {
+  return fn();
+}
+function blank_object() {
+  return Object.create(null);
+}
+function run_all(fns) {
+  fns.forEach(run);
+}
+function is_function(thing) {
+  return typeof thing === "function";
+}
+function safe_not_equal(a, b) {
+  return a != a ? b == b : a !== b || (a && typeof a === "object" || typeof a === "function");
+}
+function subscribe(store, ...callbacks) {
+  if (store == null) {
+    return noop;
+  }
+  const unsub = store.subscribe(...callbacks);
+  return unsub.unsubscribe ? () => unsub.unsubscribe() : unsub;
+}
+function get_store_value(store) {
+  let value;
+  subscribe(store, (_) => value = _)();
+  return value;
+}
+const is_client = typeof window !== "undefined";
+let now = is_client ? () => window.performance.now() : () => Date.now();
+let raf = is_client ? (cb) => requestAnimationFrame(cb) : noop;
+const tasks = new Set();
+function run_tasks(now2) {
+  tasks.forEach((task) => {
+    if (!task.c(now2)) {
+      tasks.delete(task);
+      task.f();
+    }
+  });
+  if (tasks.size !== 0)
+    raf(run_tasks);
+}
+function loop(callback) {
+  let task;
+  if (tasks.size === 0)
+    raf(run_tasks);
+  return {
+    promise: new Promise((fulfill) => {
+      tasks.add(task = { c: callback, f: fulfill });
+    }),
+    abort() {
+      tasks.delete(task);
+    }
+  };
+}
+let current_component;
+function set_current_component(component) {
+  current_component = component;
+}
+function get_current_component() {
+  if (!current_component)
+    throw new Error("Function called outside component initialization");
+  return current_component;
+}
+function onMount(fn) {
+  get_current_component().$$.on_mount.push(fn);
+}
+function afterUpdate(fn) {
+  get_current_component().$$.after_update.push(fn);
+}
+function setContext(key, context) {
+  get_current_component().$$.context.set(key, context);
+}
+function getContext(key) {
+  return get_current_component().$$.context.get(key);
+}
+Promise.resolve();
+const escaped = {
+  '"': "&quot;",
+  "'": "&#39;",
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;"
+};
+function escape(html) {
+  return String(html).replace(/["'&<>]/g, (match) => escaped[match]);
+}
+function each(items, fn) {
+  let str = "";
+  for (let i = 0; i < items.length; i += 1) {
+    str += fn(items[i], i);
+  }
+  return str;
+}
+const missing_component = {
+  $$render: () => ""
+};
+function validate_component(component, name) {
+  if (!component || !component.$$render) {
+    if (name === "svelte:component")
+      name += " this={...}";
+    throw new Error(`<${name}> is not a valid SSR component. You may need to review your build config to ensure that dependencies are compiled, rather than imported as pre-compiled modules`);
+  }
+  return component;
+}
+let on_destroy;
+function create_ssr_component(fn) {
+  function $$render(result, props, bindings, slots, context) {
+    const parent_component = current_component;
+    const $$ = {
+      on_destroy,
+      context: new Map(parent_component ? parent_component.$$.context : context || []),
+      on_mount: [],
+      before_update: [],
+      after_update: [],
+      callbacks: blank_object()
+    };
+    set_current_component({ $$ });
+    const html = fn(result, props, bindings, slots);
+    set_current_component(parent_component);
+    return html;
+  }
+  return {
+    render: (props = {}, { $$slots = {}, context = new Map() } = {}) => {
+      on_destroy = [];
+      const result = { title: "", head: "", css: new Set() };
+      const html = $$render(result, props, {}, $$slots, context);
+      run_all(on_destroy);
+      return {
+        html,
+        css: {
+          code: Array.from(result.css).map((css2) => css2.code).join("\n"),
+          map: null
+        },
+        head: result.title + result.head
+      };
+    },
+    $$render
+  };
+}
+function add_attribute(name, value, boolean) {
+  if (value == null || boolean && !value)
+    return "";
+  return ` ${name}${value === true ? "" : `=${typeof value === "string" ? JSON.stringify(escape(value)) : `"${value}"`}`}`;
+}
+function add_classes(classes) {
+  return classes ? ` class="${classes}"` : "";
+}
+var root_svelte_svelte_type_style_lang = "#svelte-announcer.svelte-1j55zn5{position:absolute;left:0;top:0;clip:rect(0 0 0 0);-webkit-clip-path:inset(50%);clip-path:inset(50%);overflow:hidden;white-space:nowrap;width:1px;height:1px}";
+const css$2 = {
+  code: "#svelte-announcer.svelte-1j55zn5{position:absolute;left:0;top:0;clip:rect(0 0 0 0);clip-path:inset(50%);overflow:hidden;white-space:nowrap;width:1px;height:1px}",
+  map: `{"version":3,"file":"root.svelte","sources":["root.svelte"],"sourcesContent":["<!-- This file is generated by @sveltejs/kit \u2014 do not edit it! -->\\n<script>\\n\\timport { setContext, afterUpdate, onMount } from 'svelte';\\n\\n\\t// stores\\n\\texport let stores;\\n\\texport let page;\\n\\n\\texport let components;\\n\\texport let props_0 = null;\\n\\texport let props_1 = null;\\n\\texport let props_2 = null;\\n\\n\\tsetContext('__svelte__', stores);\\n\\n\\t$: stores.page.set(page);\\n\\tafterUpdate(stores.page.notify);\\n\\n\\tlet mounted = false;\\n\\tlet navigated = false;\\n\\tlet title = null;\\n\\n\\tonMount(() => {\\n\\t\\tconst unsubscribe = stores.page.subscribe(() => {\\n\\t\\t\\tif (mounted) {\\n\\t\\t\\t\\tnavigated = true;\\n\\t\\t\\t\\ttitle = document.title || 'untitled page';\\n\\t\\t\\t}\\n\\t\\t});\\n\\n\\t\\tmounted = true;\\n\\t\\treturn unsubscribe;\\n\\t});\\n<\/script>\\n\\n<svelte:component this={components[0]} {...(props_0 || {})}>\\n\\t{#if components[1]}\\n\\t\\t<svelte:component this={components[1]} {...(props_1 || {})}>\\n\\t\\t\\t{#if components[2]}\\n\\t\\t\\t\\t<svelte:component this={components[2]} {...(props_2 || {})}/>\\n\\t\\t\\t{/if}\\n\\t\\t</svelte:component>\\n\\t{/if}\\n</svelte:component>\\n\\n{#if mounted}\\n\\t<div id=\\"svelte-announcer\\" aria-live=\\"assertive\\" aria-atomic=\\"true\\">\\n\\t\\t{#if navigated}\\n\\t\\t\\t{title}\\n\\t\\t{/if}\\n\\t</div>\\n{/if}\\n\\n<style>\\n\\t#svelte-announcer {\\n\\t\\tposition: absolute;\\n\\t\\tleft: 0;\\n\\t\\ttop: 0;\\n\\t\\tclip: rect(0 0 0 0);\\n\\t\\tclip-path: inset(50%);\\n\\t\\toverflow: hidden;\\n\\t\\twhite-space: nowrap;\\n\\t\\twidth: 1px;\\n\\t\\theight: 1px;\\n\\t}\\n</style>"],"names":[],"mappings":"AAsDC,iBAAiB,eAAC,CAAC,AAClB,QAAQ,CAAE,QAAQ,CAClB,IAAI,CAAE,CAAC,CACP,GAAG,CAAE,CAAC,CACN,IAAI,CAAE,KAAK,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CACnB,SAAS,CAAE,MAAM,GAAG,CAAC,CACrB,QAAQ,CAAE,MAAM,CAChB,WAAW,CAAE,MAAM,CACnB,KAAK,CAAE,GAAG,CACV,MAAM,CAAE,GAAG,AACZ,CAAC"}`
+};
+const Root = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  let { stores } = $$props;
+  let { page: page2 } = $$props;
+  let { components } = $$props;
+  let { props_0 = null } = $$props;
+  let { props_1 = null } = $$props;
+  let { props_2 = null } = $$props;
+  setContext("__svelte__", stores);
+  afterUpdate(stores.page.notify);
+  let mounted = false;
+  let navigated = false;
+  let title = null;
+  onMount(() => {
+    const unsubscribe = stores.page.subscribe(() => {
+      if (mounted) {
+        navigated = true;
+        title = document.title || "untitled page";
+      }
+    });
+    mounted = true;
+    return unsubscribe;
+  });
+  if ($$props.stores === void 0 && $$bindings.stores && stores !== void 0)
+    $$bindings.stores(stores);
+  if ($$props.page === void 0 && $$bindings.page && page2 !== void 0)
+    $$bindings.page(page2);
+  if ($$props.components === void 0 && $$bindings.components && components !== void 0)
+    $$bindings.components(components);
+  if ($$props.props_0 === void 0 && $$bindings.props_0 && props_0 !== void 0)
+    $$bindings.props_0(props_0);
+  if ($$props.props_1 === void 0 && $$bindings.props_1 && props_1 !== void 0)
+    $$bindings.props_1(props_1);
+  if ($$props.props_2 === void 0 && $$bindings.props_2 && props_2 !== void 0)
+    $$bindings.props_2(props_2);
+  $$result.css.add(css$2);
+  {
+    stores.page.set(page2);
+  }
+  return `
+
+
+${validate_component(components[0] || missing_component, "svelte:component").$$render($$result, Object.assign(props_0 || {}), {}, {
+    default: () => `${components[1] ? `${validate_component(components[1] || missing_component, "svelte:component").$$render($$result, Object.assign(props_1 || {}), {}, {
+      default: () => `${components[2] ? `${validate_component(components[2] || missing_component, "svelte:component").$$render($$result, Object.assign(props_2 || {}), {}, {})}` : ``}`
+    })}` : ``}`
+  })}
+
+${mounted ? `<div id="${"svelte-announcer"}" aria-live="${"assertive"}" aria-atomic="${"true"}" class="${"svelte-1j55zn5"}">${navigated ? `${escape(title)}` : ``}</div>` : ``}`;
+});
+function set_paths(paths) {
+}
+function set_prerendering(value) {
+}
+const handle = async ({ request, resolve }) => {
+  const cookies = cookie.parse(request.headers.cookie || "");
+  request.locals.userid = cookies.userid || v4();
+  if (request.query.has("_method")) {
+    request.method = request.query.get("_method").toUpperCase();
+  }
+  const response = await resolve(request);
+  if (!cookies.userid) {
+    response.headers["set-cookie"] = `userid=${request.locals.userid}; Path=/; HttpOnly`;
+  }
+  return response;
+};
+var user_hooks = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  handle
+});
+const template = ({ head, body }) => '<!DOCTYPE html>\n<html lang="en">\n	<head>\n		<meta charset="utf-8" />\n		<link rel="icon" href="/favicon.png" />\n		<meta name="viewport" content="width=device-width, initial-scale=1" />\n\n		' + head + '\n	</head>\n	<body>\n		<div id="svelte">' + body + "</div>\n	</body>\n</html>\n";
+let options = null;
+const default_settings = { paths: { "base": "", "assets": "/." } };
+function init(settings = default_settings) {
+  set_paths(settings.paths);
+  set_prerendering(settings.prerendering || false);
+  options = {
+    amp: false,
+    dev: false,
+    entry: {
+      file: "/./_app/start-6341b5a4.js",
+      css: ["/./_app/assets/start-8077b9bf.css"],
+      js: ["/./_app/start-6341b5a4.js", "/./_app/chunks/vendor-432035a5.js", "/./_app/chunks/singletons-12a22614.js"]
+    },
+    fetched: void 0,
+    floc: false,
+    get_component_path: (id) => "/./_app/" + entry_lookup[id],
+    get_stack: (error2) => String(error2),
+    handle_error: (error2) => {
+      if (error2.frame) {
+        console.error(error2.frame);
+      }
+      console.error(error2.stack);
+      error2.stack = options.get_stack(error2);
+    },
+    hooks: get_hooks(user_hooks),
+    hydrate: async ({ page: page2 }) => {
+      const leaf = await page2;
+      return "hydrate" in leaf ? !!leaf.hydrate : true;
+    },
+    initiator: void 0,
+    load_component,
+    manifest,
+    paths: settings.paths,
+    prerender: async ({ page: page2 }) => !!(await page2).prerender,
+    read: settings.read,
+    root: Root,
+    service_worker: null,
+    router: async ({ page: page2 }) => {
+      const leaf = await page2;
+      return "router" in leaf ? !!leaf.router : true;
+    },
+    ssr: async ({ page: page2 }) => {
+      const leaf = await page2;
+      return "ssr" in leaf ? !!leaf.ssr : true;
+    },
+    target: "#svelte",
+    template,
+    trailing_slash: "never"
+  };
+}
+const d = decodeURIComponent;
+const empty = () => ({});
+const manifest = {
+  assets: [{ "file": "favicon.ico", "size": 1571, "type": "image/vnd.microsoft.icon" }, { "file": "favicon.png", "size": 1571, "type": "image/png" }, { "file": "robots.txt", "size": 67, "type": "text/plain" }, { "file": "svelte-welcome.png", "size": 360807, "type": "image/png" }, { "file": "svelte-welcome.webp", "size": 115470, "type": "image/webp" }],
+  layout: "client/src/routes/__layout.svelte",
+  error: ".svelte-kit/build/components/error.svelte",
+  routes: [
+    {
+      type: "page",
+      pattern: /^\/$/,
+      params: empty,
+      a: ["client/src/routes/__layout.svelte", "client/src/routes/index.svelte"],
+      b: [".svelte-kit/build/components/error.svelte"]
+    },
+    {
+      type: "page",
+      pattern: /^\/messages\/?$/,
+      params: empty,
+      a: ["client/src/routes/__layout.svelte", "client/src/routes/messages.svelte"],
+      b: [".svelte-kit/build/components/error.svelte"]
+    },
+    {
+      type: "page",
+      pattern: /^\/register\/?$/,
+      params: empty,
+      a: ["client/src/routes/__layout.svelte", "client/src/routes/register.svelte"],
+      b: [".svelte-kit/build/components/error.svelte"]
+    },
+    {
+      type: "page",
+      pattern: /^\/about\/?$/,
+      params: empty,
+      a: ["client/src/routes/__layout.svelte", "client/src/routes/about.svelte"],
+      b: [".svelte-kit/build/components/error.svelte"]
+    },
+    {
+      type: "page",
+      pattern: /^\/login\/?$/,
+      params: empty,
+      a: ["client/src/routes/__layout.svelte", "client/src/routes/login.svelte"],
+      b: [".svelte-kit/build/components/error.svelte"]
+    },
+    {
+      type: "endpoint",
+      pattern: /^\/todos\.json$/,
+      params: empty,
+      load: () => Promise.resolve().then(function() {
+        return index_json;
+      })
+    },
+    {
+      type: "page",
+      pattern: /^\/todos\/?$/,
+      params: empty,
+      a: ["client/src/routes/__layout.svelte", "client/src/routes/todos/index.svelte"],
+      b: [".svelte-kit/build/components/error.svelte"]
+    },
+    {
+      type: "endpoint",
+      pattern: /^\/todos\/([^/]+?)\.json$/,
+      params: (m) => ({ uid: d(m[1]) }),
+      load: () => Promise.resolve().then(function() {
+        return _uid__json;
+      })
+    }
+  ]
+};
+const get_hooks = (hooks) => ({
+  getSession: hooks.getSession || (() => ({})),
+  handle: hooks.handle || (({ request, resolve }) => resolve(request)),
+  serverFetch: hooks.serverFetch || fetch
+});
+const module_lookup = {
+  "client/src/routes/__layout.svelte": () => Promise.resolve().then(function() {
+    return __layout;
+  }),
+  ".svelte-kit/build/components/error.svelte": () => Promise.resolve().then(function() {
+    return error;
+  }),
+  "client/src/routes/index.svelte": () => Promise.resolve().then(function() {
+    return index$1;
+  }),
+  "client/src/routes/messages.svelte": () => Promise.resolve().then(function() {
+    return messages;
+  }),
+  "client/src/routes/register.svelte": () => Promise.resolve().then(function() {
+    return register;
+  }),
+  "client/src/routes/about.svelte": () => Promise.resolve().then(function() {
+    return about;
+  }),
+  "client/src/routes/login.svelte": () => Promise.resolve().then(function() {
+    return login;
+  }),
+  "client/src/routes/todos/index.svelte": () => Promise.resolve().then(function() {
+    return index;
+  })
+};
+const metadata_lookup = { "client/src/routes/__layout.svelte": { "entry": "/./_app/pages/__layout.svelte-3487a680.js", "css": ["/./_app/assets/pages/__layout.svelte-f48abee7.css"], "js": ["/./_app/pages/__layout.svelte-3487a680.js", "/./_app/chunks/vendor-432035a5.js", "/./_app/chunks/feathersClient-c6d1aa60.js"], "styles": [] }, ".svelte-kit/build/components/error.svelte": { "entry": "/./_app/error.svelte-89d89623.js", "css": [], "js": ["/./_app/error.svelte-89d89623.js", "/./_app/chunks/vendor-432035a5.js"], "styles": [] }, "client/src/routes/index.svelte": { "entry": "/./_app/pages/index.svelte-4fc42624.js", "css": ["/./_app/assets/pages/index.svelte-98304222.css"], "js": ["/./_app/pages/index.svelte-4fc42624.js", "/./_app/chunks/vendor-432035a5.js"], "styles": [] }, "client/src/routes/messages.svelte": { "entry": "/./_app/pages/messages.svelte-5dfded98.js", "css": [], "js": ["/./_app/pages/messages.svelte-5dfded98.js", "/./_app/chunks/vendor-432035a5.js", "/./_app/chunks/feathersClient-c6d1aa60.js"], "styles": [] }, "client/src/routes/register.svelte": { "entry": "/./_app/pages/register.svelte-6049996c.js", "css": [], "js": ["/./_app/pages/register.svelte-6049996c.js", "/./_app/chunks/vendor-432035a5.js", "/./_app/chunks/feathersClient-c6d1aa60.js"], "styles": [] }, "client/src/routes/about.svelte": { "entry": "/./_app/pages/about.svelte-cc39adce.js", "css": [], "js": ["/./_app/pages/about.svelte-cc39adce.js", "/./_app/chunks/vendor-432035a5.js"], "styles": [] }, "client/src/routes/login.svelte": { "entry": "/./_app/pages/login.svelte-b83c4af9.js", "css": [], "js": ["/./_app/pages/login.svelte-b83c4af9.js", "/./_app/chunks/vendor-432035a5.js", "/./_app/chunks/singletons-12a22614.js", "/./_app/chunks/feathersClient-c6d1aa60.js"], "styles": [] }, "client/src/routes/todos/index.svelte": { "entry": "/./_app/pages/todos/index.svelte-5e1f667a.js", "css": ["/./_app/assets/pages/todos/index.svelte-05e41044.css"], "js": ["/./_app/pages/todos/index.svelte-5e1f667a.js", "/./_app/chunks/vendor-432035a5.js"], "styles": [] } };
+async function load_component(file) {
+  return {
+    module: await module_lookup[file](),
+    ...metadata_lookup[file]
+  };
+}
+function render(request, {
+  prerender: prerender2
+} = {}) {
+  const host = request.headers["host"];
+  return respond({ ...request, host }, options, { prerender: prerender2 });
+}
+const base = "https://api.svelte.dev";
+async function api(request, resource, data) {
+  if (!request.locals.userid) {
+    return { status: 401 };
+  }
+  const res = await fetch(`${base}/${resource}`, {
+    method: request.method,
+    headers: {
+      "content-type": "application/json"
+    },
+    body: data && JSON.stringify(data)
+  });
+  if (res.ok && request.method !== "GET" && request.headers.accept !== "application/json") {
+    return {
+      status: 303,
+      headers: {
+        location: "/todos"
+      }
+    };
+  }
+  return {
+    status: res.status,
+    body: await res.json()
+  };
+}
+const get = async (request) => {
+  const response = await api(request, `todos/${request.locals.userid}`);
+  if (response.status === 404) {
+    return { body: [] };
+  }
+  return response;
+};
+const post = async (request) => {
+  const response = await api(request, `todos/${request.locals.userid}`, {
+    text: request.body.get("text")
+  });
+  return response;
+};
+var index_json = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  get,
+  post
+});
+const patch = async (request) => {
+  return api(request, `todos/${request.locals.userid}/${request.params.uid}`, {
+    text: request.body.get("text"),
+    done: request.body.has("done") ? !!request.body.get("done") : void 0
+  });
+};
+const del = async (request) => {
+  return api(request, `todos/${request.locals.userid}/${request.params.uid}`);
+};
+var _uid__json = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  patch,
+  del
+});
+const getStores = () => {
+  const stores = getContext("__svelte__");
+  return {
+    page: {
+      subscribe: stores.page.subscribe
+    },
+    navigating: {
+      subscribe: stores.navigating.subscribe
+    },
+    get preloading() {
+      console.error("stores.preloading is deprecated; use stores.navigating instead");
+      return {
+        subscribe: stores.navigating.subscribe
+      };
+    },
+    session: stores.session
+  };
+};
+const page = {
+  subscribe(fn) {
+    const store = getStores().page;
+    return store.subscribe(fn);
+  }
+};
+const Header = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  let $page, $$unsubscribe_page;
+  $$unsubscribe_page = subscribe(page, (value) => $page = value);
+  $$unsubscribe_page();
+  return `<header><nav><ul><li${add_classes([$page.path === "/" ? "active" : ""].join(" ").trim())}><a sveltekit:prefetch href="${"/"}">Home</a></li>
+      <li${add_classes([$page.path === "/todos" ? "active" : ""].join(" ").trim())}><a sveltekit:prefetch href="${"/todos"}">Todos</a></li>
+      <li${add_classes([$page.path === "/messages" ? "active" : ""].join(" ").trim())}><a sveltekit:prefetch href="${"/messages"}">Messages</a></li>
+      <li${add_classes([$page.path === "/login" ? "active" : ""].join(" ").trim())}><a sveltekit:prefetch href="${"/login"}">Log in</a></li>
+      <li${add_classes([$page.path === "/register" ? "active" : ""].join(" ").trim())}><a sveltekit:prefetch href="${"/register"}">Register</a></li></ul></nav>
+
+  <div class="${"corner"}"></div></header>`;
+});
+var style = "/*! tailwindcss v2.2.4 | MIT License | https://tailwindcss.com *//*! modern-normalize v1.1.0 | MIT License | https://github.com/sindresorhus/modern-normalize */\n\n/*\nDocument\n========\n*/\n\n/**\nUse a better box model (opinionated).\n*/\n\n*,\n::before,\n::after {\n	box-sizing: border-box;\n}\n\n/**\nUse a more readable tab size (opinionated).\n*/\n\nhtml {\n	-moz-tab-size: 4;\n	-o-tab-size: 4;\n	   tab-size: 4;\n}\n\n/**\n1. Correct the line height in all browsers.\n2. Prevent adjustments of font size after orientation changes in iOS.\n*/\n\nhtml {\n	line-height: 1.15; /* 1 */\n	-webkit-text-size-adjust: 100%; /* 2 */\n}\n\n/*\nSections\n========\n*/\n\n/**\nRemove the margin in all browsers.\n*/\n\nbody {\n	margin: 0;\n}\n\n/**\nImprove consistency of default fonts in all browsers. (https://github.com/sindresorhus/modern-normalize/issues/3)\n*/\n\nbody {\n	font-family:\n		system-ui,\n		-apple-system, /* Firefox supports this but not yet `system-ui` */\n		'Segoe UI',\n		Roboto,\n		Helvetica,\n		Arial,\n		sans-serif,\n		'Apple Color Emoji',\n		'Segoe UI Emoji';\n}\n\n/*\nGrouping content\n================\n*/\n\n/**\n1. Add the correct height in Firefox.\n2. Correct the inheritance of border color in Firefox. (https://bugzilla.mozilla.org/show_bug.cgi?id=190655)\n*/\n\nhr {\n	height: 0; /* 1 */\n	color: inherit; /* 2 */\n}\n\n/*\nText-level semantics\n====================\n*/\n\n/**\nAdd the correct text decoration in Chrome, Edge, and Safari.\n*/\n\nabbr[title] {\n	-webkit-text-decoration: underline dotted;\n	        text-decoration: underline dotted;\n}\n\n/**\nAdd the correct font weight in Edge and Safari.\n*/\n\nb,\nstrong {\n	font-weight: bolder;\n}\n\n/**\n1. Improve consistency of default fonts in all browsers. (https://github.com/sindresorhus/modern-normalize/issues/3)\n2. Correct the odd 'em' font sizing in all browsers.\n*/\n\ncode,\nkbd,\nsamp,\npre {\n	font-family:\n		ui-monospace,\n		SFMono-Regular,\n		Consolas,\n		'Liberation Mono',\n		Menlo,\n		monospace; /* 1 */\n	font-size: 1em; /* 2 */\n}\n\n/**\nAdd the correct font size in all browsers.\n*/\n\nsmall {\n	font-size: 80%;\n}\n\n/**\nPrevent 'sub' and 'sup' elements from affecting the line height in all browsers.\n*/\n\nsub,\nsup {\n	font-size: 75%;\n	line-height: 0;\n	position: relative;\n	vertical-align: baseline;\n}\n\nsub {\n	bottom: -0.25em;\n}\n\nsup {\n	top: -0.5em;\n}\n\n/*\nTabular data\n============\n*/\n\n/**\n1. Remove text indentation from table contents in Chrome and Safari. (https://bugs.chromium.org/p/chromium/issues/detail?id=999088, https://bugs.webkit.org/show_bug.cgi?id=201297)\n2. Correct table border color inheritance in all Chrome and Safari. (https://bugs.chromium.org/p/chromium/issues/detail?id=935729, https://bugs.webkit.org/show_bug.cgi?id=195016)\n*/\n\ntable {\n	text-indent: 0; /* 1 */\n	border-color: inherit; /* 2 */\n}\n\n/*\nForms\n=====\n*/\n\n/**\n1. Change the font styles in all browsers.\n2. Remove the margin in Firefox and Safari.\n*/\n\nbutton,\ninput,\noptgroup,\nselect,\ntextarea {\n	font-family: inherit; /* 1 */\n	font-size: 100%; /* 1 */\n	line-height: 1.15; /* 1 */\n	margin: 0; /* 2 */\n}\n\n/**\nRemove the inheritance of text transform in Edge and Firefox.\n1. Remove the inheritance of text transform in Firefox.\n*/\n\nbutton,\nselect { /* 1 */\n	text-transform: none;\n}\n\n/**\nCorrect the inability to style clickable types in iOS and Safari.\n*/\n\nbutton,\n[type='button'],\n[type='reset'],\n[type='submit'] {\n	-webkit-appearance: button;\n}\n\n/**\nRemove the inner border and padding in Firefox.\n*/\n\n::-moz-focus-inner {\n	border-style: none;\n	padding: 0;\n}\n\n/**\nRestore the focus styles unset by the previous rule.\n*/\n\n:-moz-focusring {\n	outline: 1px dotted ButtonText;\n}\n\n/**\nRemove the additional ':invalid' styles in Firefox.\nSee: https://github.com/mozilla/gecko-dev/blob/2f9eacd9d3d995c937b4251a5557d95d494c9be1/layout/style/res/forms.css#L728-L737\n*/\n\n:-moz-ui-invalid {\n	box-shadow: none;\n}\n\n/**\nRemove the padding so developers are not caught out when they zero out 'fieldset' elements in all browsers.\n*/\n\nlegend {\n	padding: 0;\n}\n\n/**\nAdd the correct vertical alignment in Chrome and Firefox.\n*/\n\nprogress {\n	vertical-align: baseline;\n}\n\n/**\nCorrect the cursor style of increment and decrement buttons in Safari.\n*/\n\n::-webkit-inner-spin-button,\n::-webkit-outer-spin-button {\n	height: auto;\n}\n\n/**\n1. Correct the odd appearance in Chrome and Safari.\n2. Correct the outline style in Safari.\n*/\n\n[type='search'] {\n	-webkit-appearance: textfield; /* 1 */\n	outline-offset: -2px; /* 2 */\n}\n\n/**\nRemove the inner padding in Chrome and Safari on macOS.\n*/\n\n::-webkit-search-decoration {\n	-webkit-appearance: none;\n}\n\n/**\n1. Correct the inability to style clickable types in iOS and Safari.\n2. Change font properties to 'inherit' in Safari.\n*/\n\n::-webkit-file-upload-button {\n	-webkit-appearance: button; /* 1 */\n	font: inherit; /* 2 */\n}\n\n/*\nInteractive\n===========\n*/\n\n/*\nAdd the correct display in Chrome and Safari.\n*/\n\nsummary {\n	display: list-item;\n}/**\n * Manually forked from SUIT CSS Base: https://github.com/suitcss/base\n * A thin layer on top of normalize.css that provides a starting point more\n * suitable for web applications.\n */\n\n/**\n * Removes the default spacing and border for appropriate elements.\n */\n\nblockquote,\ndl,\ndd,\nh1,\nh2,\nh3,\nh4,\nh5,\nh6,\nhr,\nfigure,\np,\npre {\n  margin: 0;\n}\n\nbutton {\n  background-color: transparent;\n  background-image: none;\n}\n\nfieldset {\n  margin: 0;\n  padding: 0;\n}\n\nol,\nul {\n  list-style: none;\n  margin: 0;\n  padding: 0;\n}\n\n/**\n * Tailwind custom reset styles\n */\n\n/**\n * 1. Use the user's configured `sans` font-family (with Tailwind's default\n *    sans-serif font stack as a fallback) as a sane default.\n * 2. Use Tailwind's default \"normal\" line-height so the user isn't forced\n *    to override it to ensure consistency even when using the default theme.\n */\n\nhtml {\n  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"; /* 1 */\n  line-height: 1.5; /* 2 */\n}\n\n\n/**\n * Inherit font-family and line-height from `html` so users can set them as\n * a class directly on the `html` element.\n */\n\nbody {\n  font-family: inherit;\n  line-height: inherit;\n}\n\n/**\n * 1. Prevent padding and border from affecting element width.\n *\n *    We used to set this in the html element and inherit from\n *    the parent element for everything else. This caused issues\n *    in shadow-dom-enhanced elements like <details> where the content\n *    is wrapped by a div with box-sizing set to `content-box`.\n *\n *    https://github.com/mozdevs/cssremedy/issues/4\n *\n *\n * 2. Allow adding a border to an element by just adding a border-width.\n *\n *    By default, the way the browser specifies that an element should have no\n *    border is by setting it's border-style to `none` in the user-agent\n *    stylesheet.\n *\n *    In order to easily add borders to elements by just setting the `border-width`\n *    property, we change the default border-style for all elements to `solid`, and\n *    use border-width to hide them instead. This way our `border` utilities only\n *    need to set the `border-width` property instead of the entire `border`\n *    shorthand, making our border utilities much more straightforward to compose.\n *\n *    https://github.com/tailwindcss/tailwindcss/pull/116\n */\n\n*,\n::before,\n::after {\n  box-sizing: border-box; /* 1 */\n  border-width: 0; /* 2 */\n  border-style: solid; /* 2 */\n  border-color: currentColor; /* 2 */\n}\n\n/*\n * Ensure horizontal rules are visible by default\n */\n\nhr {\n  border-top-width: 1px;\n}\n\n/**\n * Undo the `border-style: none` reset that Normalize applies to images so that\n * our `border-{width}` utilities have the expected effect.\n *\n * The Normalize reset is unnecessary for us since we default the border-width\n * to 0 on all elements.\n *\n * https://github.com/tailwindcss/tailwindcss/issues/362\n */\n\nimg {\n  border-style: solid;\n}\n\ntextarea {\n  resize: vertical;\n}\n\ninput::-moz-placeholder, textarea::-moz-placeholder {\n  opacity: 1;\n  color: #9ca3af;\n}\n\ninput:-ms-input-placeholder, textarea:-ms-input-placeholder {\n  opacity: 1;\n  color: #9ca3af;\n}\n\ninput::placeholder,\ntextarea::placeholder {\n  opacity: 1;\n  color: #9ca3af;\n}\n\nbutton,\n[role=\"button\"] {\n  cursor: pointer;\n}\n\ntable {\n  border-collapse: collapse;\n}\n\nh1,\nh2,\nh3,\nh4,\nh5,\nh6 {\n  font-size: inherit;\n  font-weight: inherit;\n}\n\n/**\n * Reset links to optimize for opt-in styling instead of\n * opt-out.\n */\n\na {\n  color: inherit;\n  text-decoration: inherit;\n}\n\n/**\n * Reset form element properties that are easy to forget to\n * style explicitly so you don't inadvertently introduce\n * styles that deviate from your design system. These styles\n * supplement a partial reset that is already applied by\n * normalize.css.\n */\n\nbutton,\ninput,\noptgroup,\nselect,\ntextarea {\n  padding: 0;\n  line-height: inherit;\n  color: inherit;\n}\n\n/**\n * Use the configured 'mono' font family for elements that\n * are expected to be rendered with a monospace font, falling\n * back to the system monospace stack if there is no configured\n * 'mono' font family.\n */\n\npre,\ncode,\nkbd,\nsamp {\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace;\n}\n\n/**\n * 1. Make replaced elements `display: block` by default as that's\n *    the behavior you want almost all of the time. Inspired by\n *    CSS Remedy, with `svg` added as well.\n *\n *    https://github.com/mozdevs/cssremedy/issues/14\n * \n * 2. Add `vertical-align: middle` to align replaced elements more\n *    sensibly by default when overriding `display` by adding a\n *    utility like `inline`.\n *\n *    This can trigger a poorly considered linting error in some\n *    tools but is included by design.\n * \n *    https://github.com/jensimmons/cssremedy/issues/14#issuecomment-634934210\n */\n\nimg,\nsvg,\nvideo,\ncanvas,\naudio,\niframe,\nembed,\nobject {\n  display: block; /* 1 */\n  vertical-align: middle; /* 2 */\n}\n\n/**\n * Constrain images and videos to the parent width and preserve\n * their intrinsic aspect ratio.\n *\n * https://github.com/mozdevs/cssremedy/issues/14\n */\n\nimg,\nvideo {\n  max-width: 100%;\n  height: auto;\n}\n\n*, ::before, ::after {\n	--tw-translate-x: 0;\n	--tw-translate-y: 0;\n	--tw-rotate: 0;\n	--tw-skew-x: 0;\n	--tw-skew-y: 0;\n	--tw-scale-x: 1;\n	--tw-scale-y: 1;\n	--tw-transform: translateX(var(--tw-translate-x)) translateY(var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));\n	--tw-border-opacity: 1;\n	border-color: rgba(229, 231, 235, var(--tw-border-opacity));\n	--tw-shadow: 0 0 #0000;\n	--tw-ring-inset: var(--tw-empty,/*!*/ /*!*/);\n	--tw-ring-offset-width: 0px;\n	--tw-ring-offset-color: #fff;\n	--tw-ring-color: rgba(59, 130, 246, 0.5);\n	--tw-ring-offset-shadow: 0 0 #0000;\n	--tw-ring-shadow: 0 0 #0000;\n	--tw-blur: var(--tw-empty,/*!*/ /*!*/);\n	--tw-brightness: var(--tw-empty,/*!*/ /*!*/);\n	--tw-contrast: var(--tw-empty,/*!*/ /*!*/);\n	--tw-grayscale: var(--tw-empty,/*!*/ /*!*/);\n	--tw-hue-rotate: var(--tw-empty,/*!*/ /*!*/);\n	--tw-invert: var(--tw-empty,/*!*/ /*!*/);\n	--tw-saturate: var(--tw-empty,/*!*/ /*!*/);\n	--tw-sepia: var(--tw-empty,/*!*/ /*!*/);\n	--tw-drop-shadow: var(--tw-empty,/*!*/ /*!*/);\n	--tw-filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);\n	--tw-backdrop-blur: var(--tw-empty,/*!*/ /*!*/);\n	--tw-backdrop-brightness: var(--tw-empty,/*!*/ /*!*/);\n	--tw-backdrop-contrast: var(--tw-empty,/*!*/ /*!*/);\n	--tw-backdrop-grayscale: var(--tw-empty,/*!*/ /*!*/);\n	--tw-backdrop-hue-rotate: var(--tw-empty,/*!*/ /*!*/);\n	--tw-backdrop-invert: var(--tw-empty,/*!*/ /*!*/);\n	--tw-backdrop-opacity: var(--tw-empty,/*!*/ /*!*/);\n	--tw-backdrop-saturate: var(--tw-empty,/*!*/ /*!*/);\n	--tw-backdrop-sepia: var(--tw-empty,/*!*/ /*!*/);\n	--tw-backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);\n}\n\n[type='text'],[type='email'],[type='url'],[type='password'],[type='number'],[type='date'],[type='datetime-local'],[type='month'],[type='search'],[type='tel'],[type='time'],[type='week'],[multiple],textarea,select {\n	-webkit-appearance: none;\n	   -moz-appearance: none;\n	        appearance: none;\n	background-color: #fff;\n	border-color: #6b7280;\n	border-width: 1px;\n	border-radius: 0px;\n	padding-top: 0.5rem;\n	padding-right: 0.75rem;\n	padding-bottom: 0.5rem;\n	padding-left: 0.75rem;\n	font-size: 1rem;\n	line-height: 1.5rem;\n}\n\n[type='text']:focus, [type='email']:focus, [type='url']:focus, [type='password']:focus, [type='number']:focus, [type='date']:focus, [type='datetime-local']:focus, [type='month']:focus, [type='search']:focus, [type='tel']:focus, [type='time']:focus, [type='week']:focus, [multiple]:focus, textarea:focus, select:focus {\n	outline: 2px solid transparent;\n	outline-offset: 2px;\n	--tw-ring-inset: var(--tw-empty,/*!*/ /*!*/);\n	--tw-ring-offset-width: 0px;\n	--tw-ring-offset-color: #fff;\n	--tw-ring-color: #2563eb;\n	--tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);\n	--tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color);\n	box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);\n	border-color: #2563eb;\n}\n\ninput::-moz-placeholder, textarea::-moz-placeholder {\n	color: #6b7280;\n	opacity: 1;\n}\n\ninput:-ms-input-placeholder, textarea:-ms-input-placeholder {\n	color: #6b7280;\n	opacity: 1;\n}\n\ninput::placeholder,textarea::placeholder {\n	color: #6b7280;\n	opacity: 1;\n}\n\n::-webkit-datetime-edit-fields-wrapper {\n	padding: 0;\n}\n\n::-webkit-date-and-time-value {\n	min-height: 1.5em;\n}\n\nselect {\n	background-image: url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\");\n	background-position: right 0.5rem center;\n	background-repeat: no-repeat;\n	background-size: 1.5em 1.5em;\n	padding-right: 2.5rem;\n	-webkit-print-color-adjust: exact;\n	        color-adjust: exact;\n}\n\n[multiple] {\n	background-image: initial;\n	background-position: initial;\n	background-repeat: unset;\n	background-size: initial;\n	padding-right: 0.75rem;\n	-webkit-print-color-adjust: unset;\n	        color-adjust: unset;\n}\n\n[type='checkbox'],[type='radio'] {\n	-webkit-appearance: none;\n	   -moz-appearance: none;\n	        appearance: none;\n	padding: 0;\n	-webkit-print-color-adjust: exact;\n	        color-adjust: exact;\n	display: inline-block;\n	vertical-align: middle;\n	background-origin: border-box;\n	-webkit-user-select: none;\n	   -moz-user-select: none;\n	    -ms-user-select: none;\n	        user-select: none;\n	flex-shrink: 0;\n	height: 1rem;\n	width: 1rem;\n	color: #2563eb;\n	background-color: #fff;\n	border-color: #6b7280;\n	border-width: 1px;\n}\n\n[type='checkbox'] {\n	border-radius: 0px;\n}\n\n[type='radio'] {\n	border-radius: 100%;\n}\n\n[type='checkbox']:focus,[type='radio']:focus {\n	outline: 2px solid transparent;\n	outline-offset: 2px;\n	--tw-ring-inset: var(--tw-empty,/*!*/ /*!*/);\n	--tw-ring-offset-width: 2px;\n	--tw-ring-offset-color: #fff;\n	--tw-ring-color: #2563eb;\n	--tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);\n	--tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);\n	box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);\n}\n\n[type='checkbox']:checked,[type='radio']:checked {\n	border-color: transparent;\n	background-color: currentColor;\n	background-size: 100% 100%;\n	background-position: center;\n	background-repeat: no-repeat;\n}\n\n[type='checkbox']:checked {\n	background-image: url(\"data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e\");\n}\n\n[type='radio']:checked {\n	background-image: url(\"data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3ccircle cx='8' cy='8' r='3'/%3e%3c/svg%3e\");\n}\n\n[type='checkbox']:checked:hover,[type='checkbox']:checked:focus,[type='radio']:checked:hover,[type='radio']:checked:focus {\n	border-color: transparent;\n	background-color: currentColor;\n}\n\n[type='checkbox']:indeterminate {\n	background-image: url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 16 16'%3e%3cpath stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 8h8'/%3e%3c/svg%3e\");\n	border-color: transparent;\n	background-color: currentColor;\n	background-size: 100% 100%;\n	background-position: center;\n	background-repeat: no-repeat;\n}\n\n[type='checkbox']:indeterminate:hover,[type='checkbox']:indeterminate:focus {\n	border-color: transparent;\n	background-color: currentColor;\n}\n\n[type='file'] {\n	background: unset;\n	border-color: inherit;\n	border-width: 0;\n	border-radius: 0;\n	padding: 0;\n	font-size: unset;\n	line-height: inherit;\n}\n\n[type='file']:focus {\n	outline: 1px auto -webkit-focus-ring-color;\n}\n.container {\n	width: 100%;\n}\n@media (min-width: 640px) {\n\n	.container {\n		max-width: 640px;\n	}\n}\n@media (min-width: 768px) {\n\n	.container {\n		max-width: 768px;\n	}\n}\n@media (min-width: 1024px) {\n\n	.container {\n		max-width: 1024px;\n	}\n}\n@media (min-width: 1280px) {\n\n	.container {\n		max-width: 1280px;\n	}\n}\n@media (min-width: 1536px) {\n\n	.container {\n		max-width: 1536px;\n	}\n}\n.static {\n	position: static;\n}\n.col-span-1 {\n	grid-column: span 1 / span 1;\n}\n.col-span-3 {\n	grid-column: span 3 / span 3;\n}\n.mx-auto {\n	margin-left: auto;\n	margin-right: auto;\n}\n.mb-4 {\n	margin-bottom: 1rem;\n}\n.-ml-8 {\n	margin-left: -2rem;\n}\n.flex {\n	display: flex;\n}\n.grid {\n	display: grid;\n}\n.hidden {\n	display: none;\n}\n.w-full {\n	width: 100%;\n}\n.transform {\n	transform: var(--tw-transform);\n}\n.grid-cols-4 {\n	grid-template-columns: repeat(4, minmax(0, 1fr));\n}\n.flex-col {\n	flex-direction: column;\n}\n.items-center {\n	align-items: center;\n}\n.space-y-4 > :not([hidden]) ~ :not([hidden]) {\n	--tw-space-y-reverse: 0;\n	margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse)));\n	margin-bottom: calc(1rem * var(--tw-space-y-reverse));\n}\n.border {\n	border-width: 1px;\n}\n.bg-black {\n	--tw-bg-opacity: 1;\n	background-color: rgba(0, 0, 0, var(--tw-bg-opacity));\n}\n.py-2 {\n	padding-top: 0.5rem;\n	padding-bottom: 0.5rem;\n}\n.px-4 {\n	padding-left: 1rem;\n	padding-right: 1rem;\n}\n.pr-10 {\n	padding-right: 2.5rem;\n}\n.text-4xl {\n	font-size: 2.25rem;\n	line-height: 2.5rem;\n}\n.font-semibold {\n	font-weight: 600;\n}\n.leading-loose {\n	line-height: 2;\n}\n.text-gray-600 {\n	--tw-text-opacity: 1;\n	color: rgba(75, 85, 99, var(--tw-text-opacity));\n}\n.text-red-500 {\n	--tw-text-opacity: 1;\n	color: rgba(239, 68, 68, var(--tw-text-opacity));\n}\n.text-white {\n	--tw-text-opacity: 1;\n	color: rgba(255, 255, 255, var(--tw-text-opacity));\n}\n.shadow {\n	--tw-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);\n	box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);\n}\n.drop-shadow {\n	--tw-drop-shadow: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.06));\n	filter: var(--tw-filter);\n}\n.filter {\n	filter: var(--tw-filter);\n}\n.transition {\n	transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter, -webkit-backdrop-filter;\n	transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\n	transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter, -webkit-backdrop-filter;\n	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n	transition-duration: 150ms;\n}\n\n#app, body {\n  height: 100%;\n  min-height: 100vh;\n}\n";
+const socket = io("http://localhost:3030", { transports: ["websocket"] });
+const client = feathers();
+client.configure(socketIO(socket));
+if (typeof window != "undefined") {
+  client.configure(authentication({ storage: window.localStorage }));
+}
+const login$1 = async (credentials) => {
+  console.log("login");
+  try {
+    return await client.reAuthenticate();
+  } catch (error2) {
+    return await client.authenticate({
+      strategy: "local",
+      ...credentials
+    });
+  }
+};
+const register$1 = async (credentials) => {
+  try {
+    await client.service("users").create(credentials);
+    await login$1(credentials);
+  } catch (error2) {
+    throw new Error(error2);
+  }
+};
+const _layout = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  onMount(() => login$1());
+  return `${validate_component(Header, "Header").$$render($$result, {}, {}, {})}
+
+<main>${slots.default ? slots.default({}) : ``}</main>
+
+<footer><p>visit <a href="${"https://kit.svelte.dev"}">kit.svelte.dev</a> to learn SvelteKit
+  </p></footer>`;
+});
+var __layout = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  "default": _layout
+});
+function load$1({ error: error2, status }) {
+  return { props: { error: error2, status } };
+}
+const Error$1 = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  let { status } = $$props;
+  let { error: error2 } = $$props;
+  if ($$props.status === void 0 && $$bindings.status && status !== void 0)
+    $$bindings.status(status);
+  if ($$props.error === void 0 && $$bindings.error && error2 !== void 0)
+    $$bindings.error(error2);
+  return `<h1>${escape(status)}</h1>
+
+<pre>${escape(error2.message)}</pre>
+
+
+
+${error2.frame ? `<pre>${escape(error2.frame)}</pre>` : ``}
+${error2.stack ? `<pre>${escape(error2.stack)}</pre>` : ``}`;
+});
+var error = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  "default": Error$1,
+  load: load$1
+});
+const subscriber_queue = [];
+function readable(value, start) {
+  return {
+    subscribe: writable(value, start).subscribe
+  };
+}
+function writable(value, start = noop) {
+  let stop;
+  const subscribers = [];
+  function set2(new_value) {
+    if (safe_not_equal(value, new_value)) {
+      value = new_value;
+      if (stop) {
+        const run_queue = !subscriber_queue.length;
+        for (let i = 0; i < subscribers.length; i += 1) {
+          const s = subscribers[i];
+          s[1]();
+          subscriber_queue.push(s, value);
+        }
+        if (run_queue) {
+          for (let i = 0; i < subscriber_queue.length; i += 2) {
+            subscriber_queue[i][0](subscriber_queue[i + 1]);
+          }
+          subscriber_queue.length = 0;
+        }
+      }
+    }
+  }
+  function update2(fn) {
+    set2(fn(value));
+  }
+  function subscribe2(run2, invalidate = noop) {
+    const subscriber = [run2, invalidate];
+    subscribers.push(subscriber);
+    if (subscribers.length === 1) {
+      stop = start(set2) || noop;
+    }
+    run2(value);
+    return () => {
+      const index2 = subscribers.indexOf(subscriber);
+      if (index2 !== -1) {
+        subscribers.splice(index2, 1);
+      }
+      if (subscribers.length === 0) {
+        stop();
+        stop = null;
+      }
+    };
+  }
+  return { set: set2, update: update2, subscribe: subscribe2 };
+}
+function derived(stores, fn, initial_value) {
+  const single = !Array.isArray(stores);
+  const stores_array = single ? [stores] : stores;
+  const auto = fn.length < 2;
+  return readable(initial_value, (set2) => {
+    let inited = false;
+    const values = [];
+    let pending = 0;
+    let cleanup = noop;
+    const sync = () => {
+      if (pending) {
+        return;
+      }
+      cleanup();
+      const result = fn(single ? values[0] : values, set2);
+      if (auto) {
+        set2(result);
+      } else {
+        cleanup = is_function(result) ? result : noop;
+      }
+    };
+    const unsubscribers = stores_array.map((store, i) => subscribe(store, (value) => {
+      values[i] = value;
+      pending &= ~(1 << i);
+      if (inited) {
+        sync();
+      }
+    }, () => {
+      pending |= 1 << i;
+    }));
+    inited = true;
+    sync();
+    return function stop() {
+      run_all(unsubscribers);
+      cleanup();
+    };
+  });
+}
+function is_date(obj) {
+  return Object.prototype.toString.call(obj) === "[object Date]";
+}
+function tick_spring(ctx, last_value, current_value, target_value) {
+  if (typeof current_value === "number" || is_date(current_value)) {
+    const delta = target_value - current_value;
+    const velocity = (current_value - last_value) / (ctx.dt || 1 / 60);
+    const spring2 = ctx.opts.stiffness * delta;
+    const damper = ctx.opts.damping * velocity;
+    const acceleration = (spring2 - damper) * ctx.inv_mass;
+    const d2 = (velocity + acceleration) * ctx.dt;
+    if (Math.abs(d2) < ctx.opts.precision && Math.abs(delta) < ctx.opts.precision) {
+      return target_value;
+    } else {
+      ctx.settled = false;
+      return is_date(current_value) ? new Date(current_value.getTime() + d2) : current_value + d2;
+    }
+  } else if (Array.isArray(current_value)) {
+    return current_value.map((_, i) => tick_spring(ctx, last_value[i], current_value[i], target_value[i]));
+  } else if (typeof current_value === "object") {
+    const next_value = {};
+    for (const k in current_value) {
+      next_value[k] = tick_spring(ctx, last_value[k], current_value[k], target_value[k]);
+    }
+    return next_value;
+  } else {
+    throw new Error(`Cannot spring ${typeof current_value} values`);
+  }
+}
+function spring(value, opts = {}) {
+  const store = writable(value);
+  const { stiffness = 0.15, damping = 0.8, precision = 0.01 } = opts;
+  let last_time;
+  let task;
+  let current_token;
+  let last_value = value;
+  let target_value = value;
+  let inv_mass = 1;
+  let inv_mass_recovery_rate = 0;
+  let cancel_task = false;
+  function set2(new_value, opts2 = {}) {
+    target_value = new_value;
+    const token = current_token = {};
+    if (value == null || opts2.hard || spring2.stiffness >= 1 && spring2.damping >= 1) {
+      cancel_task = true;
+      last_time = now();
+      last_value = new_value;
+      store.set(value = target_value);
+      return Promise.resolve();
+    } else if (opts2.soft) {
+      const rate = opts2.soft === true ? 0.5 : +opts2.soft;
+      inv_mass_recovery_rate = 1 / (rate * 60);
+      inv_mass = 0;
+    }
+    if (!task) {
+      last_time = now();
+      cancel_task = false;
+      task = loop((now2) => {
+        if (cancel_task) {
+          cancel_task = false;
+          task = null;
+          return false;
+        }
+        inv_mass = Math.min(inv_mass + inv_mass_recovery_rate, 1);
+        const ctx = {
+          inv_mass,
+          opts: spring2,
+          settled: true,
+          dt: (now2 - last_time) * 60 / 1e3
+        };
+        const next_value = tick_spring(ctx, last_value, value, target_value);
+        last_time = now2;
+        last_value = value;
+        store.set(value = next_value);
+        if (ctx.settled) {
+          task = null;
+        }
+        return !ctx.settled;
+      });
+    }
+    return new Promise((fulfil) => {
+      task.promise.then(() => {
+        if (token === current_token)
+          fulfil();
+      });
+    });
+  }
+  const spring2 = {
+    set: set2,
+    update: (fn, opts2) => set2(fn(target_value, value), opts2),
+    subscribe: store.subscribe,
+    stiffness,
+    damping,
+    precision
+  };
+  return spring2;
+}
+var Counter_svelte_svelte_type_style_lang = ".counter.svelte-ltn89m.svelte-ltn89m{display:flex;border-top:1px solid rgba(0, 0, 0, 0.1);border-bottom:1px solid rgba(0, 0, 0, 0.1);margin:1rem 0}.counter.svelte-ltn89m button.svelte-ltn89m{width:2em;padding:0;display:flex;align-items:center;justify-content:center;border:0;background-color:transparent;color:var(--text-color);font-size:2rem}.counter.svelte-ltn89m button.svelte-ltn89m:hover{background-color:var(--secondary-color)}svg.svelte-ltn89m.svelte-ltn89m{width:25%;height:25%}path.svelte-ltn89m.svelte-ltn89m{vector-effect:non-scaling-stroke;stroke-width:2px;stroke:var(--text-color)}.counter-viewport.svelte-ltn89m.svelte-ltn89m{width:8em;height:4em;overflow:hidden;text-align:center;position:relative}.counter-viewport.svelte-ltn89m strong.svelte-ltn89m{position:absolute;display:block;width:100%;height:100%;font-weight:400;color:var(--accent-color);font-size:4rem;display:flex;align-items:center;justify-content:center}.counter-digits.svelte-ltn89m.svelte-ltn89m{position:absolute;width:100%;height:100%}";
+const css$1 = {
+  code: ".counter.svelte-ltn89m.svelte-ltn89m{display:flex;border-top:1px solid rgba(0, 0, 0, 0.1);border-bottom:1px solid rgba(0, 0, 0, 0.1);margin:1rem 0}.counter.svelte-ltn89m button.svelte-ltn89m{width:2em;padding:0;display:flex;align-items:center;justify-content:center;border:0;background-color:transparent;color:var(--text-color);font-size:2rem}.counter.svelte-ltn89m button.svelte-ltn89m:hover{background-color:var(--secondary-color)}svg.svelte-ltn89m.svelte-ltn89m{width:25%;height:25%}path.svelte-ltn89m.svelte-ltn89m{vector-effect:non-scaling-stroke;stroke-width:2px;stroke:var(--text-color)}.counter-viewport.svelte-ltn89m.svelte-ltn89m{width:8em;height:4em;overflow:hidden;text-align:center;position:relative}.counter-viewport.svelte-ltn89m strong.svelte-ltn89m{position:absolute;display:block;width:100%;height:100%;font-weight:400;color:var(--accent-color);font-size:4rem;display:flex;align-items:center;justify-content:center}.counter-digits.svelte-ltn89m.svelte-ltn89m{position:absolute;width:100%;height:100%}",
+  map: `{"version":3,"file":"Counter.svelte","sources":["Counter.svelte"],"sourcesContent":["<script lang=\\"ts\\">import { spring } from 'svelte/motion';\\nlet count = 0;\\nconst displayed_count = spring();\\n$: displayed_count.set(count);\\n$: offset = modulo($displayed_count, 1);\\nfunction modulo(n, m) {\\n    // handle negative numbers\\n    return ((n % m) + m) % m;\\n}\\n<\/script>\\n\\n<div class=\\"counter\\">\\n\\t<button on:click={() => (count -= 1)} aria-label=\\"Decrease the counter by one\\">\\n\\t\\t<svg aria-hidden=\\"true\\" viewBox=\\"0 0 1 1\\">\\n\\t\\t\\t<path d=\\"M0,0.5 L1,0.5\\" />\\n\\t\\t</svg>\\n\\t</button>\\n\\n\\t<div class=\\"counter-viewport\\">\\n\\t\\t<div class=\\"counter-digits\\" style=\\"transform: translate(0, {100 * offset}%)\\">\\n\\t\\t\\t<strong style=\\"top: -100%\\" aria-hidden=\\"true\\">{Math.floor($displayed_count + 1)}</strong>\\n\\t\\t\\t<strong>{Math.floor($displayed_count)}</strong>\\n\\t\\t</div>\\n\\t</div>\\n\\n\\t<button on:click={() => (count += 1)} aria-label=\\"Increase the counter by one\\">\\n\\t\\t<svg aria-hidden=\\"true\\" viewBox=\\"0 0 1 1\\">\\n\\t\\t\\t<path d=\\"M0,0.5 L1,0.5 M0.5,0 L0.5,1\\" />\\n\\t\\t</svg>\\n\\t</button>\\n</div>\\n\\n<style>\\n\\t.counter {\\n\\t\\tdisplay: flex;\\n\\t\\tborder-top: 1px solid rgba(0, 0, 0, 0.1);\\n\\t\\tborder-bottom: 1px solid rgba(0, 0, 0, 0.1);\\n\\t\\tmargin: 1rem 0;\\n\\t}\\n\\n\\t.counter button {\\n\\t\\twidth: 2em;\\n\\t\\tpadding: 0;\\n\\t\\tdisplay: flex;\\n\\t\\talign-items: center;\\n\\t\\tjustify-content: center;\\n\\t\\tborder: 0;\\n\\t\\tbackground-color: transparent;\\n\\t\\tcolor: var(--text-color);\\n\\t\\tfont-size: 2rem;\\n\\t}\\n\\n\\t.counter button:hover {\\n\\t\\tbackground-color: var(--secondary-color);\\n\\t}\\n\\n\\tsvg {\\n\\t\\twidth: 25%;\\n\\t\\theight: 25%;\\n\\t}\\n\\n\\tpath {\\n\\t\\tvector-effect: non-scaling-stroke;\\n\\t\\tstroke-width: 2px;\\n\\t\\tstroke: var(--text-color);\\n\\t}\\n\\n\\t.counter-viewport {\\n\\t\\twidth: 8em;\\n\\t\\theight: 4em;\\n\\t\\toverflow: hidden;\\n\\t\\ttext-align: center;\\n\\t\\tposition: relative;\\n\\t}\\n\\n\\t.counter-viewport strong {\\n\\t\\tposition: absolute;\\n\\t\\tdisplay: block;\\n\\t\\twidth: 100%;\\n\\t\\theight: 100%;\\n\\t\\tfont-weight: 400;\\n\\t\\tcolor: var(--accent-color);\\n\\t\\tfont-size: 4rem;\\n\\t\\tdisplay: flex;\\n\\t\\talign-items: center;\\n\\t\\tjustify-content: center;\\n\\t}\\n\\n\\t.counter-digits {\\n\\t\\tposition: absolute;\\n\\t\\twidth: 100%;\\n\\t\\theight: 100%;\\n\\t}\\n</style>\\n"],"names":[],"mappings":"AAiCC,QAAQ,4BAAC,CAAC,AACT,OAAO,CAAE,IAAI,CACb,UAAU,CAAE,GAAG,CAAC,KAAK,CAAC,KAAK,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,GAAG,CAAC,CACxC,aAAa,CAAE,GAAG,CAAC,KAAK,CAAC,KAAK,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,GAAG,CAAC,CAC3C,MAAM,CAAE,IAAI,CAAC,CAAC,AACf,CAAC,AAED,sBAAQ,CAAC,MAAM,cAAC,CAAC,AAChB,KAAK,CAAE,GAAG,CACV,OAAO,CAAE,CAAC,CACV,OAAO,CAAE,IAAI,CACb,WAAW,CAAE,MAAM,CACnB,eAAe,CAAE,MAAM,CACvB,MAAM,CAAE,CAAC,CACT,gBAAgB,CAAE,WAAW,CAC7B,KAAK,CAAE,IAAI,YAAY,CAAC,CACxB,SAAS,CAAE,IAAI,AAChB,CAAC,AAED,sBAAQ,CAAC,oBAAM,MAAM,AAAC,CAAC,AACtB,gBAAgB,CAAE,IAAI,iBAAiB,CAAC,AACzC,CAAC,AAED,GAAG,4BAAC,CAAC,AACJ,KAAK,CAAE,GAAG,CACV,MAAM,CAAE,GAAG,AACZ,CAAC,AAED,IAAI,4BAAC,CAAC,AACL,aAAa,CAAE,kBAAkB,CACjC,YAAY,CAAE,GAAG,CACjB,MAAM,CAAE,IAAI,YAAY,CAAC,AAC1B,CAAC,AAED,iBAAiB,4BAAC,CAAC,AAClB,KAAK,CAAE,GAAG,CACV,MAAM,CAAE,GAAG,CACX,QAAQ,CAAE,MAAM,CAChB,UAAU,CAAE,MAAM,CAClB,QAAQ,CAAE,QAAQ,AACnB,CAAC,AAED,+BAAiB,CAAC,MAAM,cAAC,CAAC,AACzB,QAAQ,CAAE,QAAQ,CAClB,OAAO,CAAE,KAAK,CACd,KAAK,CAAE,IAAI,CACX,MAAM,CAAE,IAAI,CACZ,WAAW,CAAE,GAAG,CAChB,KAAK,CAAE,IAAI,cAAc,CAAC,CAC1B,SAAS,CAAE,IAAI,CACf,OAAO,CAAE,IAAI,CACb,WAAW,CAAE,MAAM,CACnB,eAAe,CAAE,MAAM,AACxB,CAAC,AAED,eAAe,4BAAC,CAAC,AAChB,QAAQ,CAAE,QAAQ,CAClB,KAAK,CAAE,IAAI,CACX,MAAM,CAAE,IAAI,AACb,CAAC"}`
+};
+function modulo(n, m) {
+  return (n % m + m) % m;
+}
+const Counter = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  let offset;
+  let $displayed_count, $$unsubscribe_displayed_count;
+  let count = 0;
+  const displayed_count = spring();
+  $$unsubscribe_displayed_count = subscribe(displayed_count, (value) => $displayed_count = value);
+  $$result.css.add(css$1);
+  {
+    displayed_count.set(count);
+  }
+  offset = modulo($displayed_count, 1);
+  $$unsubscribe_displayed_count();
+  return `<div class="${"counter svelte-ltn89m"}"><button aria-label="${"Decrease the counter by one"}" class="${"svelte-ltn89m"}"><svg aria-hidden="${"true"}" viewBox="${"0 0 1 1"}" class="${"svelte-ltn89m"}"><path d="${"M0,0.5 L1,0.5"}" class="${"svelte-ltn89m"}"></path></svg></button>
+
+	<div class="${"counter-viewport svelte-ltn89m"}"><div class="${"counter-digits svelte-ltn89m"}" style="${"transform: translate(0, " + escape(100 * offset) + "%)"}"><strong style="${"top: -100%"}" aria-hidden="${"true"}" class="${"svelte-ltn89m"}">${escape(Math.floor($displayed_count + 1))}</strong>
+			<strong class="${"svelte-ltn89m"}">${escape(Math.floor($displayed_count))}</strong></div></div>
+
+	<button aria-label="${"Increase the counter by one"}" class="${"svelte-ltn89m"}"><svg aria-hidden="${"true"}" viewBox="${"0 0 1 1"}" class="${"svelte-ltn89m"}"><path d="${"M0,0.5 L1,0.5 M0.5,0 L0.5,1"}" class="${"svelte-ltn89m"}"></path></svg></button>
+</div>`;
+});
+const prerender$1 = true;
+const Routes = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  return `${$$result.head += `${$$result.title = `<title>Home</title>`, ""}`, ""}
+
+<section><h1><div class="${"welcome"}"><picture><source srcset="${"svelte-welcome.webp"}" type="${"image/webp"}">
+        <img src="${"svelte-welcome.png"}" alt="${"Welcome"}"></picture></div>
+
+    to your new<br>SvelteKit app
+  </h1>
+
+  <h2>try editing <strong>src/routes/index.svelte</strong></h2>
+
+  ${validate_component(Counter, "Counter").$$render($$result, {}, {}, {})}</section>`;
+});
+var index$1 = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  "default": Routes,
+  prerender: prerender$1
+});
+const Messages = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  var __awaiter2 = function(thisArg, _arguments, P, generator) {
+    function adopt(value) {
+      return value instanceof P ? value : new P(function(resolve) {
+        resolve(value);
+      });
+    }
+    return new (P || (P = Promise))(function(resolve, reject) {
+      function fulfilled(value) {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function rejected(value) {
+        try {
+          step(generator["throw"](value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function step(result) {
+        result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+      }
+      step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+  };
+  let users = [];
+  onMount(() => __awaiter2(void 0, void 0, void 0, function* () {
+    const { data } = yield client.service("users").find();
+    users = data;
+  }));
+  return `${$$result.head += `${$$result.title = `<title>Messages</title>`, ""}`, ""}
+
+<div><h1>Messages</h1>
+  <div class="${"grid grid-cols-4"}"><div class="${"col-span-1"}"><ul>${each(users, (user) => `<li>${escape(user.email)}</li>`)}</ul></div>
+    <div class="${"col-span-3"}"><p>Test</p></div></div></div>`;
+});
+var messages = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  "default": Messages
+});
+var has = Object.prototype.hasOwnProperty;
+function dequal(foo, bar) {
+  var ctor, len;
+  if (foo === bar)
+    return true;
+  if (foo && bar && (ctor = foo.constructor) === bar.constructor) {
+    if (ctor === Date)
+      return foo.getTime() === bar.getTime();
+    if (ctor === RegExp)
+      return foo.toString() === bar.toString();
+    if (ctor === Array) {
+      if ((len = foo.length) === bar.length) {
+        while (len-- && dequal(foo[len], bar[len]))
+          ;
+      }
+      return len === -1;
+    }
+    if (!ctor || typeof foo === "object") {
+      len = 0;
+      for (ctor in foo) {
+        if (has.call(foo, ctor) && ++len && !has.call(bar, ctor))
+          return false;
+        if (!(ctor in bar) || !dequal(foo[ctor], bar[ctor]))
+          return false;
+      }
+      return Object.keys(bar).length === len;
+    }
+  }
+  return foo !== foo && bar !== bar;
+}
+function subscribeOnce(observable) {
+  return new Promise((resolve) => {
+    observable.subscribe(resolve)();
+  });
+}
+function update(object, path, value) {
+  object.update((o) => {
+    set(o, path, value);
+    return o;
+  });
+}
+function cloneDeep(object) {
+  return JSON.parse(JSON.stringify(object));
+}
+function isNullish(value) {
+  return value === void 0 || value === null;
+}
+function isEmpty(object) {
+  return isNullish(object) || Object.keys(object).length <= 0;
+}
+function getValues(object) {
+  let results = [];
+  for (const [, value] of Object.entries(object)) {
+    const values = typeof value === "object" ? getValues(value) : [value];
+    results = [...results, ...values];
+  }
+  return results;
+}
+function getErrorsFromSchema(initialValues, schema, errors = {}) {
+  for (const key in schema) {
+    switch (true) {
+      case (schema[key].type === "object" && !isEmpty(schema[key].fields)): {
+        errors[key] = getErrorsFromSchema(initialValues[key], schema[key].fields, Object.assign({}, errors[key]));
+        break;
+      }
+      case schema[key].type === "array": {
+        const values = initialValues && initialValues[key] ? initialValues[key] : [];
+        errors[key] = values.map((value) => getErrorsFromSchema(value, schema[key].innerType.fields, Object.assign({}, errors[key])));
+        break;
+      }
+      default: {
+        errors[key] = "";
+      }
+    }
+  }
+  return errors;
+}
+const deepEqual = dequal;
+function assignDeep(object, value) {
+  if (Array.isArray(object)) {
+    return object.map((o) => assignDeep(o, value));
+  }
+  const copy = {};
+  for (const key in object) {
+    copy[key] = typeof object[key] === "object" ? assignDeep(object[key], value) : value;
+  }
+  return copy;
+}
+function set(object, path, value) {
+  if (new Object(object) !== object)
+    return object;
+  if (!Array.isArray(path)) {
+    path = path.toString().match(/[^.[\]]+/g) || [];
+  }
+  const result = path.slice(0, -1).reduce((accumulator, key, index2) => new Object(accumulator[key]) === accumulator[key] ? accumulator[key] : accumulator[key] = Math.trunc(Math.abs(path[index2 + 1])) === +path[index2 + 1] ? [] : {}, object);
+  result[path[path.length - 1]] = value;
+  return object;
+}
+const util = {
+  assignDeep,
+  cloneDeep,
+  deepEqual,
+  getErrorsFromSchema,
+  getValues,
+  isEmpty,
+  isNullish,
+  set,
+  subscribeOnce,
+  update
+};
+const NO_ERROR = "";
+const IS_TOUCHED = true;
+function isCheckbox(element) {
+  return element.getAttribute && element.getAttribute("type") === "checkbox";
+}
+const createForm = (config) => {
+  let initialValues = config.initialValues || {};
+  const validationSchema = config.validationSchema;
+  const validateFunction = config.validate;
+  const onSubmit = config.onSubmit;
+  const getInitial = {
+    values: () => util.cloneDeep(initialValues),
+    errors: () => validationSchema ? util.getErrorsFromSchema(initialValues, validationSchema.fields) : util.assignDeep(initialValues, NO_ERROR),
+    touched: () => util.assignDeep(initialValues, !IS_TOUCHED)
+  };
+  const form = writable(getInitial.values());
+  const errors = writable(getInitial.errors());
+  const touched = writable(getInitial.touched());
+  const isSubmitting = writable(false);
+  const isValidating = writable(false);
+  const isValid = derived(errors, ($errors) => {
+    const noErrors = util.getValues($errors).every((field) => field === NO_ERROR);
+    return noErrors;
+  });
+  const modified = derived(form, ($form) => {
+    const object = util.assignDeep($form, false);
+    for (let key in $form) {
+      object[key] = !util.deepEqual($form[key], initialValues[key]);
+    }
+    return object;
+  });
+  const isModified = derived(modified, ($modified) => {
+    return util.getValues($modified).some((field) => field === true);
+  });
+  function validateField(field) {
+    return util.subscribeOnce(form).then((values) => validateFieldValue(field, values[field]));
+  }
+  function validateFieldValue(field, value) {
+    updateTouched(field, true);
+    if (validationSchema) {
+      isValidating.set(true);
+      return validationSchema.validateAt(field, get_store_value(form)).then(() => util.update(errors, field, "")).catch((error2) => util.update(errors, field, error2.message)).finally(() => {
+        isValidating.set(false);
+      });
+    }
+    if (validateFunction) {
+      isValidating.set(true);
+      return Promise.resolve().then(() => validateFunction({ [field]: value })).then((errs) => util.update(errors, field, !util.isNullish(errs) ? errs[field] : "")).finally(() => {
+        isValidating.set(false);
+      });
+    }
+    return Promise.resolve();
+  }
+  function updateValidateField(field, value) {
+    updateField(field, value);
+    return validateFieldValue(field, value);
+  }
+  function handleChange(event) {
+    const element = event.target;
+    const field = element.name || element.id;
+    const value = isCheckbox(element) ? element.checked : element.value;
+    return updateValidateField(field, value);
+  }
+  function handleSubmit(event) {
+    if (event && event.preventDefault) {
+      event.preventDefault();
+    }
+    isSubmitting.set(true);
+    return util.subscribeOnce(form).then((values) => {
+      if (typeof validateFunction === "function") {
+        isValidating.set(true);
+        return Promise.resolve().then(() => validateFunction(values)).then((error2) => {
+          if (util.isEmpty(error2)) {
+            clearErrorsAndSubmit(values);
+          } else {
+            errors.set(error2);
+            isSubmitting.set(false);
+          }
+        }).finally(() => isValidating.set(false));
+      }
+      if (validationSchema) {
+        isValidating.set(true);
+        return validationSchema.validate(values, { abortEarly: false }).then(() => clearErrorsAndSubmit(values)).catch((yupErrors) => {
+          if (yupErrors && yupErrors.inner) {
+            const updatedErrors = getInitial.errors();
+            yupErrors.inner.map((error2) => util.set(updatedErrors, error2.path, error2.message));
+            errors.set(updatedErrors);
+          }
+          isSubmitting.set(false);
+        }).finally(() => isValidating.set(false));
+      }
+      clearErrorsAndSubmit(values);
+    });
+  }
+  function handleReset() {
+    form.set(getInitial.values());
+    errors.set(getInitial.errors());
+    touched.set(getInitial.touched());
+  }
+  function clearErrorsAndSubmit(values) {
+    return Promise.resolve().then(() => errors.set(getInitial.errors())).then(() => onSubmit(values, form, errors)).finally(() => isSubmitting.set(false));
+  }
+  function updateField(field, value) {
+    util.update(form, field, value);
+  }
+  function updateTouched(field, value) {
+    util.update(touched, field, value);
+  }
+  function updateInitialValues(newValues) {
+    initialValues = newValues;
+    handleReset();
+  }
+  return {
+    form,
+    errors,
+    touched,
+    modified,
+    isValid,
+    isSubmitting,
+    isValidating,
+    isModified,
+    handleChange,
+    handleSubmit,
+    handleReset,
+    updateField,
+    updateValidateField,
+    updateTouched,
+    validateField,
+    updateInitialValues,
+    state: derived([
+      form,
+      errors,
+      touched,
+      modified,
+      isValid,
+      isValidating,
+      isSubmitting,
+      isModified
+    ], ([
+      $form,
+      $errors,
+      $touched,
+      $modified,
+      $isValid,
+      $isValidating,
+      $isSubmitting,
+      $isModified
+    ]) => ({
+      form: $form,
+      errors: $errors,
+      touched: $touched,
+      modified: $modified,
+      isValid: $isValid,
+      isSubmitting: $isSubmitting,
+      isValidating: $isValidating,
+      isModified: $isModified
+    }))
+  };
+};
+const Fa = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  let { class: clazz = "" } = $$props;
+  let { id = "" } = $$props;
+  let { style: style2 = "" } = $$props;
+  let { icon } = $$props;
+  let { fw = false } = $$props;
+  let { flip = false } = $$props;
+  let { pull = "" } = $$props;
+  let { rotate = "" } = $$props;
+  let { size = "" } = $$props;
+  let { color = "" } = $$props;
+  let { primaryColor = "" } = $$props;
+  let { secondaryColor = "" } = $$props;
+  let { primaryOpacity = 1 } = $$props;
+  let { secondaryOpacity = 0.4 } = $$props;
+  let { swapOpacity = false } = $$props;
+  let i;
+  let s;
+  let transform;
+  if ($$props.class === void 0 && $$bindings.class && clazz !== void 0)
+    $$bindings.class(clazz);
+  if ($$props.id === void 0 && $$bindings.id && id !== void 0)
+    $$bindings.id(id);
+  if ($$props.style === void 0 && $$bindings.style && style2 !== void 0)
+    $$bindings.style(style2);
+  if ($$props.icon === void 0 && $$bindings.icon && icon !== void 0)
+    $$bindings.icon(icon);
+  if ($$props.fw === void 0 && $$bindings.fw && fw !== void 0)
+    $$bindings.fw(fw);
+  if ($$props.flip === void 0 && $$bindings.flip && flip !== void 0)
+    $$bindings.flip(flip);
+  if ($$props.pull === void 0 && $$bindings.pull && pull !== void 0)
+    $$bindings.pull(pull);
+  if ($$props.rotate === void 0 && $$bindings.rotate && rotate !== void 0)
+    $$bindings.rotate(rotate);
+  if ($$props.size === void 0 && $$bindings.size && size !== void 0)
+    $$bindings.size(size);
+  if ($$props.color === void 0 && $$bindings.color && color !== void 0)
+    $$bindings.color(color);
+  if ($$props.primaryColor === void 0 && $$bindings.primaryColor && primaryColor !== void 0)
+    $$bindings.primaryColor(primaryColor);
+  if ($$props.secondaryColor === void 0 && $$bindings.secondaryColor && secondaryColor !== void 0)
+    $$bindings.secondaryColor(secondaryColor);
+  if ($$props.primaryOpacity === void 0 && $$bindings.primaryOpacity && primaryOpacity !== void 0)
+    $$bindings.primaryOpacity(primaryOpacity);
+  if ($$props.secondaryOpacity === void 0 && $$bindings.secondaryOpacity && secondaryOpacity !== void 0)
+    $$bindings.secondaryOpacity(secondaryOpacity);
+  if ($$props.swapOpacity === void 0 && $$bindings.swapOpacity && swapOpacity !== void 0)
+    $$bindings.swapOpacity(swapOpacity);
+  i = icon && icon.icon || [0, 0, "", [], ""];
+  {
+    {
+      let float;
+      let width;
+      const height = "1em";
+      let lineHeight;
+      let fontSize;
+      let textAlign;
+      let verticalAlign = "-.125em";
+      const overflow = "visible";
+      if (fw) {
+        textAlign = "center";
+        width = "1.25em";
+      }
+      if (pull) {
+        float = pull;
+      }
+      if (size) {
+        if (size == "lg") {
+          fontSize = "1.33333em";
+          lineHeight = ".75em";
+          verticalAlign = "-.225em";
+        } else if (size == "xs") {
+          fontSize = ".75em";
+        } else if (size == "sm") {
+          fontSize = ".875em";
+        } else {
+          fontSize = size.replace("x", "em");
+        }
+      }
+      const styleObj = {
+        float,
+        width,
+        height,
+        "line-height": lineHeight,
+        "font-size": fontSize,
+        "text-align": textAlign,
+        "vertical-align": verticalAlign,
+        overflow
+      };
+      let styleStr = "";
+      for (const prop in styleObj) {
+        if (styleObj[prop]) {
+          styleStr += `${prop}:${styleObj[prop]};`;
+        }
+      }
+      s = styleStr + style2;
+    }
+  }
+  {
+    {
+      let t = "";
+      if (flip) {
+        let flipX = 1;
+        let flipY = 1;
+        if (flip == "horizontal") {
+          flipX = -1;
+        } else if (flip == "vertical") {
+          flipY = -1;
+        } else {
+          flipX = flipY = -1;
+        }
+        t += ` scale(${flipX} ${flipY})`;
+      }
+      if (rotate) {
+        t += ` rotate(${rotate} 0 0)`;
+      }
+      transform = t;
+    }
+  }
+  return `${i[4] ? `<svg${add_attribute("id", id, 0)}${add_attribute("class", clazz, 0)}${add_attribute("style", s, 0)}${add_attribute("viewBox", `0 0 ${i[0]} ${i[1]}`, 0)} aria-hidden="${"true"}" role="${"img"}" xmlns="${"http://www.w3.org/2000/svg"}"><g transform="${"translate(256 256)"}"><g${add_attribute("transform", transform, 0)}>${typeof i[4] == "string" ? `<path${add_attribute("d", i[4], 0)}${add_attribute("fill", color || primaryColor || "currentColor", 0)} transform="${"translate(-256 -256)"}"></path>` : `<path${add_attribute("d", i[4][0], 0)}${add_attribute("fill", secondaryColor || color || "currentColor", 0)}${add_attribute("fill-opacity", swapOpacity != false ? primaryOpacity : secondaryOpacity, 0)} transform="${"translate(-256 -256)"}"></path>
+          <path${add_attribute("d", i[4][1], 0)}${add_attribute("fill", primaryColor || color || "currentColor", 0)}${add_attribute("fill-opacity", swapOpacity != false ? secondaryOpacity : primaryOpacity, 0)} transform="${"translate(-256 -256)"}"></path>`}</g></g></svg>` : ``}`;
+});
+const Register = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  let $form, $$unsubscribe_form;
+  let $errors, $$unsubscribe_errors;
+  var __awaiter2 = function(thisArg, _arguments, P, generator) {
+    function adopt(value) {
+      return value instanceof P ? value : new P(function(resolve) {
+        resolve(value);
+      });
+    }
+    return new (P || (P = Promise))(function(resolve, reject) {
+      function fulfilled(value) {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function rejected(value) {
+        try {
+          step(generator["throw"](value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function step(result) {
+        result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+      }
+      step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+  };
+  const { form, errors, state, handleChange, handleSubmit } = createForm({
+    initialValues: { email: "", password: "" },
+    validationSchema: yup.object().shape({
+      email: yup.string().email(),
+      password: yup.string().min(6)
+    }),
+    onSubmit: (values) => __awaiter2(void 0, void 0, void 0, function* () {
+      const response = yield register$1(values);
+      console.log({ response });
+    })
+  });
+  $$unsubscribe_form = subscribe(form, (value) => $form = value);
+  $$unsubscribe_errors = subscribe(errors, (value) => $errors = value);
+  $$unsubscribe_form();
+  $$unsubscribe_errors();
+  return `<div class="${"container mx-auto"}"><h1 class="${"text-4xl font-semibold leading-loose mb-4"}">Register</h1>
+  <form class="${"flex flex-col space-y-4"}"><div class="${"flex flex-col"}"><label for="${"email"}">Email</label>
+      <input type="${"text"}" name="${"email"}" id="${"email"}" autocomplete="${"username"}"${add_attribute("value", $form.email, 1)}>
+      ${$errors.email ? `<span>${escape($errors.email)}</span>` : ``}</div>
+    <div class="${"flex flex-col"}"><label for="${"password"}">Password</label>
+      <div class="${"flex items-center"}"><input type="${"password"}" name="${"password"}" id="${"password"}" class="${"w-full pr-10"}" autocomplete="${"current-password"}"${add_attribute("value", $form.password, 1)}>
+        <button type="${"button"}" class="${"-ml-8 z-1 text-gray-600"}">${validate_component(Fa, "Fa").$$render($$result, {
+    icon: faEye,
+    fw: true
+  }, {}, {})}</button></div>
+      ${$errors.password ? `<span class="${"text-red-500"}">${escape($errors.password)}</span>` : ``}</div>
+    <div><button type="${"submit"}" class="${"bg-black text-white font-semibold py-2 px-4 shadow"}">Submit
+      </button></div></form></div>`;
+});
+var register = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  "default": Register
+});
+const browser = false;
+const dev = false;
+const hydrate = dev;
+const router = browser;
+const prerender = true;
+const About = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  return `${$$result.head += `${$$result.title = `<title>About</title>`, ""}`, ""}
+
+<div class="${"content"}"><h1>About this app</h1>
+
+  <p>This is a <a href="${"https://kit.svelte.dev"}">SvelteKit</a> app. You can make your
+    own by typing the following into your command line and following the prompts:
+  </p>
+
+  
+  <pre>npm init svelte@next</pre>
+
+  <p>The page you&#39;re looking at is purely static HTML, with no client-side
+    interactivity needed. Because of that, we don&#39;t need to load any JavaScript.
+    Try viewing the page&#39;s source, or opening the devtools network panel and
+    reloading.
+  </p>
+
+  <p>The <a href="${"/todos"}">TODOs</a> page illustrates SvelteKit&#39;s data loading and
+    form handling. Try using it with JavaScript disabled!
+  </p></div>`;
+});
+var about = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  "default": About,
+  hydrate,
+  router,
+  prerender
+});
+function guard(name) {
+  return () => {
+    throw new Error(`Cannot call ${name}(...) on the server`);
+  };
+}
+const goto = guard("goto");
+const Login = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  let $form, $$unsubscribe_form;
+  let $errors, $$unsubscribe_errors;
+  var __awaiter2 = function(thisArg, _arguments, P, generator) {
+    function adopt(value) {
+      return value instanceof P ? value : new P(function(resolve) {
+        resolve(value);
+      });
+    }
+    return new (P || (P = Promise))(function(resolve, reject) {
+      function fulfilled(value) {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function rejected(value) {
+        try {
+          step(generator["throw"](value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function step(result) {
+        result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+      }
+      step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+  };
+  const { form, errors, state, handleChange, handleSubmit } = createForm({
+    initialValues: { email: "", password: "" },
+    validationSchema: yup.object().shape({
+      email: yup.string().email(),
+      password: yup.string().min(6)
+    }),
+    onSubmit: (values) => __awaiter2(void 0, void 0, void 0, function* () {
+      const response = yield login$1(values);
+      console.log({ response });
+      if (response.user)
+        goto("/messages");
+    })
+  });
+  $$unsubscribe_form = subscribe(form, (value) => $form = value);
+  $$unsubscribe_errors = subscribe(errors, (value) => $errors = value);
+  $$unsubscribe_form();
+  $$unsubscribe_errors();
+  return `<div class="${"container mx-auto"}"><h1 class="${"text-4xl font-semibold leading-loose mb-4"}">Login</h1>
+  <form class="${"flex flex-col space-y-4"}"><div class="${"flex flex-col"}"><label for="${"email"}">Email</label>
+      <input type="${"text"}" name="${"email"}" id="${"email"}" autocomplete="${"username"}"${add_attribute("value", $form.email, 1)}>
+      ${$errors.email ? `<span>${escape($errors.email)}</span>` : ``}</div>
+    <div class="${"flex flex-col"}"><label for="${"password"}">Password</label>
+      <div class="${"flex items-center"}"><input type="${"password"}" name="${"password"}" id="${"password"}" class="${"w-full pr-10"}" autocomplete="${"current-password"}"${add_attribute("value", $form.password, 1)}>
+        <button type="${"button"}" class="${"-ml-8 z-1 text-gray-600"}">${validate_component(Fa, "Fa").$$render($$result, {
+    icon: faEye,
+    fw: true
+  }, {}, {})}</button></div>
+      ${$errors.password ? `<span class="${"text-red-500"}">${escape($errors.password)}</span>` : ``}</div>
+    <div><button type="${"submit"}" class="${"bg-black text-white font-semibold py-2 px-4 shadow"}">Submit
+      </button></div></form></div>`;
+});
+var login = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  "default": Login
+});
+var index_svelte_svelte_type_style_lang = `.todos.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{width:100%;max-width:var(--column-width);margin:var(--column-margin-top) auto 0 auto;line-height:1}.new.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{margin:0 0 0.5rem 0}input.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{border:1px solid transparent}input.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd:focus-visible{box-shadow:inset 1px 1px 6px rgba(0, 0, 0, 0.1);border:1px solid #ff3e00 !important;outline:none}.new.svelte-dmxqmd input.svelte-dmxqmd.svelte-dmxqmd{font-size:28px;width:100%;padding:0.5em 1em 0.3em 1em;box-sizing:border-box;background:rgba(255, 255, 255, 0.05);border-radius:8px;text-align:center}.todo.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{display:grid;grid-template-columns:2rem 1fr 2rem;grid-gap:0.5rem;align-items:center;margin:0 0 0.5rem 0;padding:0.5rem;background-color:white;border-radius:8px;filter:drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.1));transform:translate(-1px, -1px);transition:filter 0.2s, transform 0.2s}.done.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{transform:none;opacity:0.4;filter:drop-shadow(0px 0px 1px rgba(0, 0, 0, 0.1))}form.text.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{position:relative;display:flex;align-items:center;flex:1}.todo.svelte-dmxqmd input.svelte-dmxqmd.svelte-dmxqmd{flex:1;padding:0.5em 2em 0.5em 0.8em;border-radius:3px}.todo.svelte-dmxqmd button.svelte-dmxqmd.svelte-dmxqmd{width:2em;height:2em;border:none;background-color:transparent;background-position:50% 50%;background-repeat:no-repeat}button.toggle.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{border:1px solid rgba(0, 0, 0, 0.2);border-radius:50%;box-sizing:border-box;background-size:1em auto}.done.svelte-dmxqmd .toggle.svelte-dmxqmd.svelte-dmxqmd{background-image:url("data:image/svg+xml,%3Csvg width='22' height='16' viewBox='0 0 22 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.5 1.5L7.4375 14.5L1.5 8.5909' stroke='%23676778' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}.delete.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{background-image:url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4.5 5V22H19.5V5H4.5Z' fill='%23676778' stroke='%23676778' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M10 10V16.5' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M14 10V16.5' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M2 5H22' stroke='%23676778' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M8 5L9.6445 2H14.3885L16 5H8Z' fill='%23676778' stroke='%23676778' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E%0A");opacity:0.2}.delete.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd:hover,.delete.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd:focus{transition:opacity 0.2s;opacity:1}.save.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{position:absolute;right:0;opacity:0;background-image:url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.5 2H3.5C2.67158 2 2 2.67157 2 3.5V20.5C2 21.3284 2.67158 22 3.5 22H20.5C21.3284 22 22 21.3284 22 20.5V3.5C22 2.67157 21.3284 2 20.5 2Z' fill='%23676778' stroke='%23676778' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M17 2V11H7.5V2H17Z' fill='white' stroke='white' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M13.5 5.5V7.5' stroke='%23676778' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M5.99844 2H18.4992' stroke='%23676778' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E%0A")}.todo.svelte-dmxqmd input.svelte-dmxqmd:focus+.save.svelte-dmxqmd,.save.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd:focus{transition:opacity 0.2s;opacity:1}`;
+const css = {
+  code: `.todos.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{width:100%;max-width:var(--column-width);margin:var(--column-margin-top) auto 0 auto;line-height:1}.new.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{margin:0 0 0.5rem 0}input.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{border:1px solid transparent}input.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd:focus-visible{box-shadow:inset 1px 1px 6px rgba(0, 0, 0, 0.1);border:1px solid #ff3e00 !important;outline:none}.new.svelte-dmxqmd input.svelte-dmxqmd.svelte-dmxqmd{font-size:28px;width:100%;padding:0.5em 1em 0.3em 1em;box-sizing:border-box;background:rgba(255, 255, 255, 0.05);border-radius:8px;text-align:center}.todo.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{display:grid;grid-template-columns:2rem 1fr 2rem;grid-gap:0.5rem;align-items:center;margin:0 0 0.5rem 0;padding:0.5rem;background-color:white;border-radius:8px;filter:drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.1));transform:translate(-1px, -1px);transition:filter 0.2s, transform 0.2s}.done.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{transform:none;opacity:0.4;filter:drop-shadow(0px 0px 1px rgba(0, 0, 0, 0.1))}form.text.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{position:relative;display:flex;align-items:center;flex:1}.todo.svelte-dmxqmd input.svelte-dmxqmd.svelte-dmxqmd{flex:1;padding:0.5em 2em 0.5em 0.8em;border-radius:3px}.todo.svelte-dmxqmd button.svelte-dmxqmd.svelte-dmxqmd{width:2em;height:2em;border:none;background-color:transparent;background-position:50% 50%;background-repeat:no-repeat}button.toggle.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{border:1px solid rgba(0, 0, 0, 0.2);border-radius:50%;box-sizing:border-box;background-size:1em auto}.done.svelte-dmxqmd .toggle.svelte-dmxqmd.svelte-dmxqmd{background-image:url("data:image/svg+xml,%3Csvg width='22' height='16' viewBox='0 0 22 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.5 1.5L7.4375 14.5L1.5 8.5909' stroke='%23676778' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}.delete.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{background-image:url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4.5 5V22H19.5V5H4.5Z' fill='%23676778' stroke='%23676778' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M10 10V16.5' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M14 10V16.5' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M2 5H22' stroke='%23676778' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M8 5L9.6445 2H14.3885L16 5H8Z' fill='%23676778' stroke='%23676778' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E%0A");opacity:0.2}.delete.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd:hover,.delete.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd:focus{transition:opacity 0.2s;opacity:1}.save.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd{position:absolute;right:0;opacity:0;background-image:url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.5 2H3.5C2.67158 2 2 2.67157 2 3.5V20.5C2 21.3284 2.67158 22 3.5 22H20.5C21.3284 22 22 21.3284 22 20.5V3.5C22 2.67157 21.3284 2 20.5 2Z' fill='%23676778' stroke='%23676778' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M17 2V11H7.5V2H17Z' fill='white' stroke='white' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M13.5 5.5V7.5' stroke='%23676778' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M5.99844 2H18.4992' stroke='%23676778' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E%0A")}.todo.svelte-dmxqmd input.svelte-dmxqmd:focus+.save.svelte-dmxqmd,.save.svelte-dmxqmd.svelte-dmxqmd.svelte-dmxqmd:focus{transition:opacity 0.2s;opacity:1}`,
+  map: `{"version":3,"file":"index.svelte","sources":["index.svelte"],"sourcesContent":["<script context=\\"module\\" lang=\\"ts\\">var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {\\n    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }\\n    return new (P || (P = Promise))(function (resolve, reject) {\\n        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }\\n        function rejected(value) { try { step(generator[\\"throw\\"](value)); } catch (e) { reject(e); } }\\n        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }\\n        step((generator = generator.apply(thisArg, _arguments || [])).next());\\n    });\\n};\\nimport { enhance } from '$lib/form';\\n;\\n// see https://kit.svelte.dev/docs#loading\\nexport const load = ({ fetch }) => __awaiter(void 0, void 0, void 0, function* () {\\n    const res = yield fetch('/todos.json');\\n    if (res.ok) {\\n        const todos = yield res.json();\\n        return {\\n            props: { todos }\\n        };\\n    }\\n    const { message } = yield res.json();\\n    return {\\n        error: new Error(message)\\n    };\\n});\\n<\/script>\\n\\n<script lang=\\"ts\\">var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {\\n    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }\\n    return new (P || (P = Promise))(function (resolve, reject) {\\n        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }\\n        function rejected(value) { try { step(generator[\\"throw\\"](value)); } catch (e) { reject(e); } }\\n        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }\\n        step((generator = generator.apply(thisArg, _arguments || [])).next());\\n    });\\n};\\nimport { scale } from 'svelte/transition';\\nimport { flip } from 'svelte/animate';\\nexport let todos;\\nfunction patch(res) {\\n    return __awaiter(this, void 0, void 0, function* () {\\n        const todo = yield res.json();\\n        todos = todos.map((t) => {\\n            if (t.uid === todo.uid)\\n                return todo;\\n            return t;\\n        });\\n    });\\n}\\n<\/script>\\n\\n<svelte:head>\\n\\t<title>Todos</title>\\n</svelte:head>\\n\\n<div class=\\"todos\\">\\n\\t<h1>Todos</h1>\\n\\n\\t<form\\n\\t\\tclass=\\"new\\"\\n\\t\\taction=\\"/todos.json\\"\\n\\t\\tmethod=\\"post\\"\\n\\t\\tuse:enhance={{\\n\\t\\t\\tresult: async (res, form) => {\\n\\t\\t\\t\\tconst created = await res.json();\\n\\t\\t\\t\\ttodos = [...todos, created];\\n\\n\\t\\t\\t\\tform.reset();\\n\\t\\t\\t}\\n\\t\\t}}\\n\\t>\\n\\t\\t<input name=\\"text\\" aria-label=\\"Add todo\\" placeholder=\\"+ tap to add a todo\\" />\\n\\t</form>\\n\\n\\t{#each todos as todo (todo.uid)}\\n\\t\\t<div\\n\\t\\t\\tclass=\\"todo\\"\\n\\t\\t\\tclass:done={todo.done}\\n\\t\\t\\ttransition:scale|local={{ start: 0.7 }}\\n\\t\\t\\tanimate:flip={{ duration: 200 }}\\n\\t\\t>\\n\\t\\t\\t<form\\n\\t\\t\\t\\taction=\\"/todos/{todo.uid}.json?_method=patch\\"\\n\\t\\t\\t\\tmethod=\\"post\\"\\n\\t\\t\\t\\tuse:enhance={{\\n\\t\\t\\t\\t\\tpending: (data) => {\\n\\t\\t\\t\\t\\t\\ttodo.done = !!data.get('done');\\n\\t\\t\\t\\t\\t},\\n\\t\\t\\t\\t\\tresult: patch\\n\\t\\t\\t\\t}}\\n\\t\\t\\t>\\n\\t\\t\\t\\t<input type=\\"hidden\\" name=\\"done\\" value={todo.done ? '' : 'true'} />\\n\\t\\t\\t\\t<button class=\\"toggle\\" aria-label=\\"Mark todo as {todo.done ? 'not done' : 'done'}\\" />\\n\\t\\t\\t</form>\\n\\n\\t\\t\\t<form\\n\\t\\t\\t\\tclass=\\"text\\"\\n\\t\\t\\t\\taction=\\"/todos/{todo.uid}.json?_method=patch\\"\\n\\t\\t\\t\\tmethod=\\"post\\"\\n\\t\\t\\t\\tuse:enhance={{\\n\\t\\t\\t\\t\\tresult: patch\\n\\t\\t\\t\\t}}\\n\\t\\t\\t>\\n\\t\\t\\t\\t<input aria-label=\\"Edit todo\\" type=\\"text\\" name=\\"text\\" value={todo.text} />\\n\\t\\t\\t\\t<button class=\\"save\\" aria-label=\\"Save todo\\" />\\n\\t\\t\\t</form>\\n\\n\\t\\t\\t<form\\n\\t\\t\\t\\taction=\\"/todos/{todo.uid}.json?_method=delete\\"\\n\\t\\t\\t\\tmethod=\\"post\\"\\n\\t\\t\\t\\tuse:enhance={{\\n\\t\\t\\t\\t\\tresult: () => {\\n\\t\\t\\t\\t\\t\\ttodos = todos.filter((t) => t.uid !== todo.uid);\\n\\t\\t\\t\\t\\t}\\n\\t\\t\\t\\t}}\\n\\t\\t\\t>\\n\\t\\t\\t\\t<button class=\\"delete\\" aria-label=\\"Delete todo\\" />\\n\\t\\t\\t</form>\\n\\t\\t</div>\\n\\t{/each}\\n</div>\\n\\n<style>\\n\\t.todos {\\n\\t\\twidth: 100%;\\n\\t\\tmax-width: var(--column-width);\\n\\t\\tmargin: var(--column-margin-top) auto 0 auto;\\n\\t\\tline-height: 1;\\n\\t}\\n\\n\\t.new {\\n\\t\\tmargin: 0 0 0.5rem 0;\\n\\t}\\n\\n\\tinput {\\n\\t\\tborder: 1px solid transparent;\\n\\t}\\n\\n\\tinput:focus-visible {\\n\\t\\tbox-shadow: inset 1px 1px 6px rgba(0, 0, 0, 0.1);\\n\\t\\tborder: 1px solid #ff3e00 !important;\\n\\t\\toutline: none;\\n\\t}\\n\\n\\t.new input {\\n\\t\\tfont-size: 28px;\\n\\t\\twidth: 100%;\\n\\t\\tpadding: 0.5em 1em 0.3em 1em;\\n\\t\\tbox-sizing: border-box;\\n\\t\\tbackground: rgba(255, 255, 255, 0.05);\\n\\t\\tborder-radius: 8px;\\n\\t\\ttext-align: center;\\n\\t}\\n\\n\\t.todo {\\n\\t\\tdisplay: grid;\\n\\t\\tgrid-template-columns: 2rem 1fr 2rem;\\n\\t\\tgrid-gap: 0.5rem;\\n\\t\\talign-items: center;\\n\\t\\tmargin: 0 0 0.5rem 0;\\n\\t\\tpadding: 0.5rem;\\n\\t\\tbackground-color: white;\\n\\t\\tborder-radius: 8px;\\n\\t\\tfilter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.1));\\n\\t\\ttransform: translate(-1px, -1px);\\n\\t\\ttransition: filter 0.2s, transform 0.2s;\\n\\t}\\n\\n\\t.done {\\n\\t\\ttransform: none;\\n\\t\\topacity: 0.4;\\n\\t\\tfilter: drop-shadow(0px 0px 1px rgba(0, 0, 0, 0.1));\\n\\t}\\n\\n\\tform.text {\\n\\t\\tposition: relative;\\n\\t\\tdisplay: flex;\\n\\t\\talign-items: center;\\n\\t\\tflex: 1;\\n\\t}\\n\\n\\t.todo input {\\n\\t\\tflex: 1;\\n\\t\\tpadding: 0.5em 2em 0.5em 0.8em;\\n\\t\\tborder-radius: 3px;\\n\\t}\\n\\n\\t.todo button {\\n\\t\\twidth: 2em;\\n\\t\\theight: 2em;\\n\\t\\tborder: none;\\n\\t\\tbackground-color: transparent;\\n\\t\\tbackground-position: 50% 50%;\\n\\t\\tbackground-repeat: no-repeat;\\n\\t}\\n\\n\\tbutton.toggle {\\n\\t\\tborder: 1px solid rgba(0, 0, 0, 0.2);\\n\\t\\tborder-radius: 50%;\\n\\t\\tbox-sizing: border-box;\\n\\t\\tbackground-size: 1em auto;\\n\\t}\\n\\n\\t.done .toggle {\\n\\t\\tbackground-image: url(\\"data:image/svg+xml,%3Csvg width='22' height='16' viewBox='0 0 22 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.5 1.5L7.4375 14.5L1.5 8.5909' stroke='%23676778' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\\");\\n\\t}\\n\\n\\t.delete {\\n\\t\\tbackground-image: url(\\"data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4.5 5V22H19.5V5H4.5Z' fill='%23676778' stroke='%23676778' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M10 10V16.5' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M14 10V16.5' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M2 5H22' stroke='%23676778' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M8 5L9.6445 2H14.3885L16 5H8Z' fill='%23676778' stroke='%23676778' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E%0A\\");\\n\\t\\topacity: 0.2;\\n\\t}\\n\\n\\t.delete:hover,\\n\\t.delete:focus {\\n\\t\\ttransition: opacity 0.2s;\\n\\t\\topacity: 1;\\n\\t}\\n\\n\\t.save {\\n\\t\\tposition: absolute;\\n\\t\\tright: 0;\\n\\t\\topacity: 0;\\n\\t\\tbackground-image: url(\\"data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.5 2H3.5C2.67158 2 2 2.67157 2 3.5V20.5C2 21.3284 2.67158 22 3.5 22H20.5C21.3284 22 22 21.3284 22 20.5V3.5C22 2.67157 21.3284 2 20.5 2Z' fill='%23676778' stroke='%23676778' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M17 2V11H7.5V2H17Z' fill='white' stroke='white' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M13.5 5.5V7.5' stroke='%23676778' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M5.99844 2H18.4992' stroke='%23676778' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E%0A\\");\\n\\t}\\n\\n\\t.todo input:focus + .save,\\n\\t.save:focus {\\n\\t\\ttransition: opacity 0.2s;\\n\\t\\topacity: 1;\\n\\t}\\n</style>\\n"],"names":[],"mappings":"AA2HC,MAAM,0CAAC,CAAC,AACP,KAAK,CAAE,IAAI,CACX,SAAS,CAAE,IAAI,cAAc,CAAC,CAC9B,MAAM,CAAE,IAAI,mBAAmB,CAAC,CAAC,IAAI,CAAC,CAAC,CAAC,IAAI,CAC5C,WAAW,CAAE,CAAC,AACf,CAAC,AAED,IAAI,0CAAC,CAAC,AACL,MAAM,CAAE,CAAC,CAAC,CAAC,CAAC,MAAM,CAAC,CAAC,AACrB,CAAC,AAED,KAAK,0CAAC,CAAC,AACN,MAAM,CAAE,GAAG,CAAC,KAAK,CAAC,WAAW,AAC9B,CAAC,AAED,+CAAK,cAAc,AAAC,CAAC,AACpB,UAAU,CAAE,KAAK,CAAC,GAAG,CAAC,GAAG,CAAC,GAAG,CAAC,KAAK,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,GAAG,CAAC,CAChD,MAAM,CAAE,GAAG,CAAC,KAAK,CAAC,OAAO,CAAC,UAAU,CACpC,OAAO,CAAE,IAAI,AACd,CAAC,AAED,kBAAI,CAAC,KAAK,4BAAC,CAAC,AACX,SAAS,CAAE,IAAI,CACf,KAAK,CAAE,IAAI,CACX,OAAO,CAAE,KAAK,CAAC,GAAG,CAAC,KAAK,CAAC,GAAG,CAC5B,UAAU,CAAE,UAAU,CACtB,UAAU,CAAE,KAAK,GAAG,CAAC,CAAC,GAAG,CAAC,CAAC,GAAG,CAAC,CAAC,IAAI,CAAC,CACrC,aAAa,CAAE,GAAG,CAClB,UAAU,CAAE,MAAM,AACnB,CAAC,AAED,KAAK,0CAAC,CAAC,AACN,OAAO,CAAE,IAAI,CACb,qBAAqB,CAAE,IAAI,CAAC,GAAG,CAAC,IAAI,CACpC,QAAQ,CAAE,MAAM,CAChB,WAAW,CAAE,MAAM,CACnB,MAAM,CAAE,CAAC,CAAC,CAAC,CAAC,MAAM,CAAC,CAAC,CACpB,OAAO,CAAE,MAAM,CACf,gBAAgB,CAAE,KAAK,CACvB,aAAa,CAAE,GAAG,CAClB,MAAM,CAAE,YAAY,GAAG,CAAC,GAAG,CAAC,GAAG,CAAC,KAAK,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,GAAG,CAAC,CAAC,CACnD,SAAS,CAAE,UAAU,IAAI,CAAC,CAAC,IAAI,CAAC,CAChC,UAAU,CAAE,MAAM,CAAC,IAAI,CAAC,CAAC,SAAS,CAAC,IAAI,AACxC,CAAC,AAED,KAAK,0CAAC,CAAC,AACN,SAAS,CAAE,IAAI,CACf,OAAO,CAAE,GAAG,CACZ,MAAM,CAAE,YAAY,GAAG,CAAC,GAAG,CAAC,GAAG,CAAC,KAAK,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,GAAG,CAAC,CAAC,AACpD,CAAC,AAED,IAAI,KAAK,0CAAC,CAAC,AACV,QAAQ,CAAE,QAAQ,CAClB,OAAO,CAAE,IAAI,CACb,WAAW,CAAE,MAAM,CACnB,IAAI,CAAE,CAAC,AACR,CAAC,AAED,mBAAK,CAAC,KAAK,4BAAC,CAAC,AACZ,IAAI,CAAE,CAAC,CACP,OAAO,CAAE,KAAK,CAAC,GAAG,CAAC,KAAK,CAAC,KAAK,CAC9B,aAAa,CAAE,GAAG,AACnB,CAAC,AAED,mBAAK,CAAC,MAAM,4BAAC,CAAC,AACb,KAAK,CAAE,GAAG,CACV,MAAM,CAAE,GAAG,CACX,MAAM,CAAE,IAAI,CACZ,gBAAgB,CAAE,WAAW,CAC7B,mBAAmB,CAAE,GAAG,CAAC,GAAG,CAC5B,iBAAiB,CAAE,SAAS,AAC7B,CAAC,AAED,MAAM,OAAO,0CAAC,CAAC,AACd,MAAM,CAAE,GAAG,CAAC,KAAK,CAAC,KAAK,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,GAAG,CAAC,CACpC,aAAa,CAAE,GAAG,CAClB,UAAU,CAAE,UAAU,CACtB,eAAe,CAAE,GAAG,CAAC,IAAI,AAC1B,CAAC,AAED,mBAAK,CAAC,OAAO,4BAAC,CAAC,AACd,gBAAgB,CAAE,IAAI,uQAAuQ,CAAC,AAC/R,CAAC,AAED,OAAO,0CAAC,CAAC,AACR,gBAAgB,CAAE,IAAI,yrBAAyrB,CAAC,CAChtB,OAAO,CAAE,GAAG,AACb,CAAC,AAED,iDAAO,MAAM,CACb,iDAAO,MAAM,AAAC,CAAC,AACd,UAAU,CAAE,OAAO,CAAC,IAAI,CACxB,OAAO,CAAE,CAAC,AACX,CAAC,AAED,KAAK,0CAAC,CAAC,AACN,QAAQ,CAAE,QAAQ,CAClB,KAAK,CAAE,CAAC,CACR,OAAO,CAAE,CAAC,CACV,gBAAgB,CAAE,IAAI,gpBAAgpB,CAAC,AACxqB,CAAC,AAED,mBAAK,CAAC,mBAAK,MAAM,CAAG,mBAAK,CACzB,+CAAK,MAAM,AAAC,CAAC,AACZ,UAAU,CAAE,OAAO,CAAC,IAAI,CACxB,OAAO,CAAE,CAAC,AACX,CAAC"}`
+};
+var __awaiter = function(thisArg, _arguments, P, generator) {
+  function adopt(value) {
+    return value instanceof P ? value : new P(function(resolve) {
+      resolve(value);
+    });
+  }
+  return new (P || (P = Promise))(function(resolve, reject) {
+    function fulfilled(value) {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+    function rejected(value) {
+      try {
+        step(generator["throw"](value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+    function step(result) {
+      result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+    }
+    step((generator = generator.apply(thisArg, _arguments || [])).next());
+  });
+};
+const load = ({ fetch: fetch2 }) => __awaiter(void 0, void 0, void 0, function* () {
+  const res = yield fetch2("/todos.json");
+  if (res.ok) {
+    const todos = yield res.json();
+    return { props: { todos } };
+  }
+  const { message } = yield res.json();
+  return { error: new Error(message) };
+});
+const Todos = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  (function(thisArg, _arguments, P, generator) {
+    function adopt(value) {
+      return value instanceof P ? value : new P(function(resolve) {
+        resolve(value);
+      });
+    }
+    return new (P || (P = Promise))(function(resolve, reject) {
+      function fulfilled(value) {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function rejected(value) {
+        try {
+          step(generator["throw"](value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function step(result) {
+        result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+      }
+      step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+  });
+  let { todos } = $$props;
+  if ($$props.todos === void 0 && $$bindings.todos && todos !== void 0)
+    $$bindings.todos(todos);
+  $$result.css.add(css);
+  return `${$$result.head += `${$$result.title = `<title>Todos</title>`, ""}`, ""}
+
+<div class="${"todos svelte-dmxqmd"}"><h1>Todos</h1>
+
+	<form class="${"new svelte-dmxqmd"}" action="${"/todos.json"}" method="${"post"}"><input name="${"text"}" aria-label="${"Add todo"}" placeholder="${"+ tap to add a todo"}" class="${"svelte-dmxqmd"}"></form>
+
+	${each(todos, (todo) => `<div class="${["todo svelte-dmxqmd", todo.done ? "done" : ""].join(" ").trim()}"><form action="${"/todos/" + escape(todo.uid) + ".json?_method=patch"}" method="${"post"}"><input type="${"hidden"}" name="${"done"}"${add_attribute("value", todo.done ? "" : "true", 0)} class="${"svelte-dmxqmd"}">
+				<button class="${"toggle svelte-dmxqmd"}" aria-label="${"Mark todo as " + escape(todo.done ? "not done" : "done")}"></button></form>
+
+			<form class="${"text svelte-dmxqmd"}" action="${"/todos/" + escape(todo.uid) + ".json?_method=patch"}" method="${"post"}"><input aria-label="${"Edit todo"}" type="${"text"}" name="${"text"}"${add_attribute("value", todo.text, 0)} class="${"svelte-dmxqmd"}">
+				<button class="${"save svelte-dmxqmd"}" aria-label="${"Save todo"}"></button></form>
+
+			<form action="${"/todos/" + escape(todo.uid) + ".json?_method=delete"}" method="${"post"}"><button class="${"delete svelte-dmxqmd"}" aria-label="${"Delete todo"}"></button></form>
+		</div>`)}
+</div>`;
+});
+var index = /* @__PURE__ */ Object.freeze({
+  __proto__: null,
+  [Symbol.toStringTag]: "Module",
+  "default": Todos,
+  load
+});
+export { init, render };
